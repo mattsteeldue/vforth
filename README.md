@@ -1,4 +1,13 @@
 # vforth
+__v.Forth 1.5m__ 
+
+__build 20200808 - Matteo Vitturi, 1990-2020__
+
+This version is a back-porting from v.Forth 1.5 NEXTZXOS version.
+
+
+
+# vforth
 __v.Forth 1.413e__ 
 
 __build 20190311 - Matteo Vitturi, 1990-2019__
