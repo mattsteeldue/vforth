@@ -3,7 +3,7 @@ __v.Forth 1.5m__
 
 __build 20200808 - Matteo Vitturi, 1990-2020__
 
-This version is a back-porting to Microdrive and DiSCIPLE MSG (from v.Forth 1.5 NEXTZXOS version).
+This version is a back-porting to Microdrive and DiSCIPLE MSG from v.Forth 1.5 NEXTZXOS version.
 
 
 
