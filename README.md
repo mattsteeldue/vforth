@@ -1,6 +1,17 @@
 # vforth
 __v.Forth 1.5m__ 
 
+__build 20210215 - Matteo Vitturi, 1990-2021__
+
+Keeping these back-ported version aligned with the new Next version.
+Introducing example game "Chomp" in blocks 600-670. It's a PacMan style.
+Once AUTOEXEC completes its LOAD, give 600 LOAD, then GAME.
+Cursor keys (or Cursor Joystick maybe)
+
+
+
+__v.Forth 1.5m__ 
+
 __build 20200808 - Matteo Vitturi, 1990-2020__
 
 This version is a back-porting to Microdrive and DiSCIPLE MSG from v.Forth 1.5 NEXTZXOS version.
