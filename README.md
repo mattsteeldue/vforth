@@ -33,7 +33,7 @@ __build 20190311 - Matteo Vitturi, 1990-2019__
 
 In spring of 1990 I had the chance to work for a couple of months on a Sinclair ZX Spectrum 48K equipped with a Microdrive. 
 Among the other things, I succeeded to disassemble an reassemble the machine code of a Forth for Spectrum 
-Oasis Software's __"White Lightning"__ (https://sites.google.com/view/vforth/wl-dis).
+Oasis Software's __"White Lightning"__ https://worldofspectrum.org/archive/software/utilities/white-lightning-oasis-software (my pencil work is here https://sites.google.com/view/vforth/wl-dis).
 
 My purpose was to make effective the use of the Microdrive within the Forth environment. 
 
