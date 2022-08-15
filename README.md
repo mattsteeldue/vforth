@@ -1,4 +1,15 @@
 # vforth
+
+
+
+__v.Forth 1.52m__ 
+
+__build 20220730 - Matteo Vitturi, 1990-2022__
+
+Back-porting from v.Forth 1.52 - Sinclair ZX Spectrum Next Version.
+
+
+
 __v.Forth 1.5m__ 
 
 __build 20210215 - Matteo Vitturi, 1990-2021__

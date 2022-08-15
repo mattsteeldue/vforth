@@ -1,7 +1,7 @@
 \ ______________________________________________________________________ 
 \
-.( v-Forth 1.5 MDR/MGT version ) CR
-.( build 20210131 ) CR 
+.( v-Forth 1.52 MDR/MGT version ) CR
+.( build 20220730 ) CR 
 \
 \ ZX Microdrive version + MGT DISCiPLE version
 \ ______________________________________________________________________
@@ -11,7 +11,7 @@
 \ provided that the copyright notice is kept.  
 \ ______________________________________________________________________
 \
-\ by Matteo Vitturi, 1990-2021
+\ by Matteo Vitturi, 1990-2022
 \
 \ https://sites.google.com/view/vforth/vforth1413
 \ https://www.oocities.org/matteo_vitturi/english/index.htm
@@ -43,14 +43,14 @@
 \ Z80 Registers usage map
 \
 \ AF 
-\ BC - Instruction Pointer: should be preserved during ROM/OS calls
+\ BC - Instruction Pointer: it must be preserved during ROM/OS calls
 \ DE -         (Low  word when used for 32-bit manipulations)
 \ HL - Working (High word when used for 32-bit manipulations)
 \
 \ AF'- Sometime used for backup purpose
-\ BC'- Not used: available in fast Interrupt via EXX
-\ DE'- Not used: available in fast Interrupt via EXX
-\ HL'- Not used: available in fast Interrupt via EXX (saved at startup)
+\ BC'- Sometime used in tricky definitions
+\ DE'- Sometime used in tricky definitions
+\ HL'- Sometime used in tricky definitions
 \
 \ SP - Calc Stack Pointer
 \ IX - Inner interpreter next-address pointer. This is 2T-state faster than JP
@@ -80,7 +80,7 @@ HEX
         \ 6A00 \ 27136 \ = room for 3 buffers below ORIGIN
         \ 8000 \ 32768 \ = final
         DP !
-    ENDIF
+    THEN
     ;
 
 
@@ -116,6 +116,7 @@ DECIMAL
      0  VALUE     next^         \ ptr to NEXT in inner interpreter
      0  VALUE     exec^         \ ptr to exec xt
      0  VALUE     branch^       \ PFA of BRANCH
+     0  VALUE     branch^^      \ ptr to be patched with PFA of BRANCH
      0  VALUE     loop^         \ entry-point for compiled (+LOOP)
      0  VALUE     do^           \ entry-point for compiled (DO)
      0  VALUE     emitc^        \ entry-point for EMITC
@@ -144,10 +145,10 @@ DECIMAL
      0  VALUE     quit^         \ patch of ERROR with QUIT
      0  VALUE     abort^        \ patch of (ABORT)
    \ 0  VALUE     xi/o^         \ patch of XI/O and WARM in COLD
-   \ 0  VALUE     xi/o2^        \ patch of XI/O in WARM 
+   \ 0  VALUE     xi/o2^        \ patch of BLK-INIT in WARM 
      0  VALUE     y^            \ patch of COLD/WARM start
      0  VALUE     splash^       \ patch of SPLASH in WARM
-     0  VALUE     autoexec^     \ patch of LOAD in WARM
+     0  VALUE     autoexec^     \ patch of NOOP in ABORT
      0  VALUE     .^            \ patch of .    in MESSAGE
 
 .( Psh2 Psh1 Next )
@@ -162,14 +163,14 @@ DECIMAL
 : Next     ASSEMBLER                        JPIX ;
 
 \ macro of "RP" virtual register emulation
-: LDHL,RP  ASSEMBLER  LDHL() rp^      AA, ;
-: LDRP,HL  ASSEMBLER  LD()HL rp^      AA, ;
+: LDHL,RP  ASSEMBLER  LDHL()     rp^      AA, ;
+: LDRP,HL  ASSEMBLER  LD()HL     rp^      AA, ;
 
 \ at the end, we need to patch every reference to RP-address.
 \ we ALLOT some area to keep track of them whenever we need.
-     0  VARIABLE rp# DECIMAL 40 ALLOT
-    rp# VARIABLE rp#^ 
-    rp# DECIMAL 42 ERASE
+     0  VARIABLE rp# DECIMAL 42 ALLOT    0  rp# !
+    rp# VARIABLE rp#^                  rp# rp#^ !
+    rp# DECIMAL 44 ERASE
 
 \ accumulate pointers to be patched at the end using final_rp_patch
 : !rp^ ( address -- )
@@ -194,7 +195,7 @@ DECIMAL
     IF
         \ COMPILE LIT ,
         lit~ , ,
-    ENDIF
+    THEN
     ; 
     IMMEDIATE
 
@@ -204,12 +205,12 @@ DECIMAL
         SWAP
         [COMPILE] Literal
         [COMPILE] Literal
-    ENDIF
+    THEN
     ; 
     IMMEDIATE
     
 .( IF ... THEN )
-.( IF ... ELSE ... ENDIF )
+.( IF ... ELSE ... THEN )
 \ 
 : If    (   -- a 2 ) \ compile-time
         ( f --     ) \ run-time   
@@ -220,7 +221,7 @@ DECIMAL
     ; 
     IMMEDIATE
     
-: Endif ( a 2 -- ) \ compile-time
+: Then ( a 2 -- ) \ compile-time
         (     -- ) \ run-time    
     ?COMP
     2 ?PAIRS  
@@ -228,9 +229,9 @@ DECIMAL
     ; 
     IMMEDIATE
     
-\ : Then ( a 2 -- ) \ compile-time 
-\        (     -- ) \ run-time
-\     [COMPILE] Endif 
+\ : Endif ( a 2 -- ) \ compile-time 
+\        (     -- )  \ run-time
+\     [COMPILE] Then 
 \     ; 
 \     IMMEDIATE
 
@@ -240,7 +241,7 @@ DECIMAL
     2 ?PAIRS  
     branch~ ,  \ COMPILE BRANCH
     HERE 0 , 
-    SWAP 2 [COMPILE] Endif \ Then
+    SWAP 2 [COMPILE] Then \ Then
     2 
     ; 
     IMMEDIATE
@@ -287,7 +288,7 @@ DECIMAL
     2SWAP
     [COMPILE] Again
     2 - 
-    [COMPILE] Endif \ Then
+    [COMPILE] Then \ Then
     ; 
     IMMEDIATE
 
@@ -331,7 +332,7 @@ DECIMAL
 \ KEY  DROP
 
 \ force origin to an even address.
-HERE 1 AND ALLOT
+\ HERE 1 AND ALLOT    
 SET-DP-TO-ORG
 
 \
@@ -345,7 +346,7 @@ SET-DP-TO-ORG
      
 HERE TO org^
 \ 6100h or 6400h or 8000h depending on which version is compiling
-\ this addresses simply is a "remind" for myself.
+\ this addresses simply are a "remind" for myself.
 
 \ +000
         ASSEMBLER
@@ -397,7 +398,7 @@ HERE TO org^
 \ end of data for COLD start
 
 \ +026
-                 HEX 8F C, 88 C,    \ Used by KEY
+                 HEX 8F C, 8C C,    \ Cursor faces used by KEY
 \ +028
                  HEX 5F C, 00 C,    \ Used by KEY
 \ +02A   ( Echoed IX after +3DOS call )
@@ -413,6 +414,7 @@ HEX 030 +ORIGIN TO rp^
  
        R0 @ , \ 2  - \ was HEX EADE    ,  
 
+
  
 \ from this point we can use LDHL,RP and LDRP,HL Assembler macros
 \ instead of their equivalent long sequences.
@@ -422,12 +424,12 @@ HEX 030 +ORIGIN TO rp^
 \ hook for Psh2
 
         ASSEMBLER
-        PUSH    DE|
+\       PUSH    DE|   no more used since we use JP (IX)
 
 \ 6127h
 \ hook for Psh1
          
-        PUSH    HL|
+\       PUSH    HL|   no more used since we use JP (IX)
 
 \ 6128h
 \ hook for Next - inner interpreter
@@ -464,7 +466,8 @@ CODE lit ( -- n )
         LDA(X)  BC|
         INCX    BC|
         LD      H'|    A|
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
         ' lit TO lit~
@@ -478,9 +481,83 @@ CODE execute ( xt -- )
         POP     HL|
 \     \ JP      exec^  AA,
         JR      exec^  HERE 1 + - D,
+
 \ in general, we use JR within the same definition, JP to go beyond.
 \ but it can be useful using JR in some closest words to save a few bytes
         C;
+
+
+\ 6181h
+." (+LOOP) "
+\ compiled by +LOOP. it uses the top two values of return-stack to
+\ keep track of index and limit, they are accessed via I and I'
+CODE (+loop) ( n -- )
+
+    HERE TO loop^
+    
+        EXX
+
+        HERE !rp^ 
+        LDHL,RP              \ macro 30h +Origin
+        
+        POP     BC|         \ BC is increment
+        
+        LD      E'| (HL)|   \ DE keeps index before increment
+        LD      A'|    E|   \ index is incremented in memory.
+        ADDA     C|
+        LD   (HL)'|    A|
+        INCX    HL|
+        LD      D'| (HL)|
+        LD      A'|    D|
+        ADCA     B|
+        LD   (HL)'|    A|
+        INCX    HL|
+
+        LD      A'|    E|
+        SUBA  (HL)|   
+        LD      E'|    A|
+        INCX    HL|
+        LD      A'|    D|
+        SBCA  (HL)|   
+        LD      D'|    A|   \ DE is index - limit : limit is the "new zero"
+
+        EXDEHL  
+        ADDHL   BC|         \ HL is index - limit + increment
+        BIT      7|    B|    \ doesn't affect carry flag
+        JRF     Z'|    HOLDPLACE \ if increment is negative then
+            CCF                  \ complement carry flag
+        HERE DISP, \ THEN,
+        JRF    CY'|    HOLDPLACE
+            \ stay in loop, increment index
+            EXX
+            JR      HERE  TO  branch^^    26  D,
+          \  JP         branch^  AA,
+        HERE DISP, \ THEN,
+
+        EXDEHL  
+        INCX    HL|
+
+        HERE !rp^
+        LDRP,HL              \ macro 30h +Origin
+
+        EXX
+        INCX    BC|
+        INCX    BC|
+        Next
+        C;
+
+
+\ 61BAh
+." (LOOP) "
+\ same as (+LOOP) but index is incremented by 1 
+CODE (loop)    ( -- )
+        LDX     HL|    1 NN,
+        PUSH    HL|
+      \ JP      loop^  AA,
+        JR      loop^  HERE 1 + - D,
+        C;
+
+        ' (loop) TO (loop)~
 
 
 \ 6153h
@@ -506,6 +583,8 @@ CODE branch ( -- )
         
         ' branch TO branch~
 
+        branch^  branch^^  1+ -  branch^^ C!
+
 
 \ 616Ah
 .( 0BRANCH )
@@ -516,8 +595,8 @@ CODE 0branch ( f -- )
         POP     HL|
         LD      A'|    L|
         ORA      H|
-        JPF      Z|    branch^  AA,
-\     \ JRF     Z'|    branch^  HERE 1 + - D,
+      \ JPF      Z|    branch^  AA,
+        JRF     Z'|    branch^  HERE 1 + - D,
         INCX    BC|
         INCX    BC|
         Next
@@ -526,67 +605,21 @@ CODE 0branch ( f -- )
         ' 0branch TO 0branch~
 
 
-\ 6181h
-." (LOOP) "
-\ compiled by LOOP. it uses the top two values of return-stack to
-\ keep track of index and limit
-CODE (loop) ( -- )
+CODE (leave) ( -- )
 
-        LDX     DE|    1 NN,
-
-    HERE TO loop^
-    
         HERE !rp^ 
         LDHL,RP              \ macro 30h +Origin
         
-        LD      A'| (HL)|    \ increment ind
-        ADDA     E|
-        LD   (HL)'|    A|
-        LD      E'|    A|
-        INCX    HL|
-        LD      A'| (HL)|
-        ADCA     D|
-        LD   (HL)'|    A|
-        INCX    HL|
-        BIT      7|    D|     
-        LD      D'|    A|
-        JRF    NZ'|    HOLDPLACE \ if increment is positive then
-            LD      A'|    E|
-            SUBA  (HL)|
-            LD      A'|    D|
-            INCX    HL|
-            SBCA  (HL)|
-        JR        HOLDPLACE  SWAP HERE DISP, \ ELSE,
-            LD      A'| (HL)|
-            SUBA     E|
-            INCX    HL|
-            LD      A'| (HL)|
-            SBCA     D|
-        HERE DISP, \ THEN,
-        JPF      M|  branch^  AA,
-\     !!JRF    CY'|  branch^  HERE 1 + - D,
-        INCX    HL|
+        LDX     DE|  4  NN,  \ UNLOOP index & limit from Return Stack      
+        ADDHL   DE|
 
         HERE !rp^
         LDRP,HL              \ macro 30h +Origin
         
-        INCX    BC|
-        INCX    BC|
+      \ JP      branch^  AA, \ jump out of loop
+        JR      branch^  HERE 1 + - D,
         Next
-        C;
-
-        ' (loop) TO (loop)~
-
-
-\ 61BAh
-." (+LOOP) "
-\ same as (LOOP) but index is incremented by n (instead of just 1)
-CODE (+loop)    ( n -- )
-         
-        POP     DE|
-        JP      loop^  AA,
-\     \ JR      loop^  HERE 1 + - D,
-        C;
+        C;       
 
 
 \ new
@@ -606,8 +639,8 @@ CODE (?do)      ( lim ind -- )
         JRF    NZ'| HOLDPLACE \ if lim == ind
             POP     DE|
             POP     HL|
-            JP      branch^  AA,
-\         \ JR      branch^  HERE 1 + - D,
+          \ JP      branch^  AA,
+            JR      branch^  HERE 1 + - D,
         HERE DISP, \ THEN,
         
     HERE TO do^
@@ -653,8 +686,8 @@ CODE (do) ( lim ind -- )
          
         DECX    BC|     \ balance the two INC BC at end of (?DO)
         DECX    BC|
-        JP      do^  AA,
-\     \ JR      do^  HERE 1 +  - D, 
+      \ JP      do^  AA,
+        JR      do^  HERE 1 +  - D, 
         C;
 
         ' (do) TO (do)~
@@ -668,12 +701,25 @@ CODE i ( -- ind )
 
         HERE !rp^ 
         LDHL,RP              \ macro 30h +Origin
-
+HERE
         LD      E'| (HL)|
         INCX    HL|
         LD      D'| (HL)|
         PUSH    DE|
         Next
+        C;
+
+
+.( I' )
+\ used between DO and LOOP or between DO e +LOOP to copy on top of stack
+\ the limit of the index-loop
+CODE i' ( -- lim )
+
+        HERE !rp^ 
+        LDHL,RP              \ macro 30h +Origin
+        INCX    HL|
+        INCX    HL|
+        JR      BACK,        \ jump to "HERE" on I 
         C;
 
 
@@ -705,11 +751,15 @@ CODE digit ( c n -- u 1  |  0 )
             JRF    NC'| HOLDPLACE \ if less than base, good
                 LD      E'|    A|
                 LDX     HL|    1 NN,
-                Psh2
+                PUSH    DE|
+                PUSH    HL|
+                Next
+
             HERE DISP, \ THEN,
         HERE DISP, HERE DISP, \ THEN, THEN, \ ... (!!) 
         LDX     HL| 0 NN,
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
@@ -718,7 +768,7 @@ CODE digit ( c n -- u 1  |  0 )
 \ no other register is altered
     ASSEMBLER
     HERE TO upper^
-        RET                 \ CASEON is default. This location is patched
+        RET                 \ This location is patched
                             \ at runtime by CASEON and CASEOFF
         CPN     HEX 61 N,   \ lower-case "a"
         RETF    CY|
@@ -755,7 +805,8 @@ CODE upper ( c1 -- c2 )
         LD      A'|    L|
         CALL    upper^  1+  AA,
         LD      L'|    A|
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
@@ -784,7 +835,7 @@ CODE (find) ( addr voc -- addr 0 | cfa b 1  )
                     INCX    HL|
                     INCX    DE|
                     LDA(X)  DE|
-                    
+
 \ case   sensitive option  
 \                   XORA  (HL)|
 
@@ -805,7 +856,7 @@ CODE (find) ( addr voc -- addr 0 | cfa b 1  )
 
                     ADDA     A|         \ ignore msb in compare
                     JRF    NZ'| HOLDPLACE SWAP \ didn't match, jump (*)
-                
+
                 JRF    NC'| HOLDPLACE SWAP DISP, 
                 \ loop until last byte msb is found set 
                 \ that bit marks the ending char of this word
@@ -819,7 +870,9 @@ CODE (find) ( addr voc -- addr 0 | cfa b 1  )
                     LD      E'|    A|
                     LDN     D'|    0 N,
                     LDX     HL|    1 NN,
-                    Psh2
+                    PUSH    DE|
+                    PUSH    HL|
+                    Next
 
                 HERE DISP, \ THEN,  \ didn't match (*)
                 JRF    CY'| HOLDPLACE SWAP \ not the end of word, jump (**) 
@@ -851,7 +904,8 @@ CODE (find) ( addr voc -- addr 0 | cfa b 1  )
         POP     HL|         \ with this, it leaves addr unchanged
 
         LDX     HL| 0 NN,
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
@@ -923,21 +977,50 @@ HEX
         C;
 
 
+." (MAP) "
+\ translate character c1 using mapping string a2 and a2
+\ if c1 is not present within string a1 then 
+\ c2 = c2 if it is not translated. n is the length of both a1 and a2.
+CODE (map) ( a2 a1 n c1 -- c2 )
+        EXX
+        POP     HL|
+        LD      A'|    L|
+        POP     BC|
+        POP     HL|
+        LD      D'|    B|
+        LD      E'|    C|
+        CPIR 
+        POP     HL|
+        JRF    NZ'| HOLDPLACE
+            ADDHL   DE|
+            DECX    HL|
+            SBCHL   BC|
+            LD      A'| (HL)|
+        HERE DISP,
+        LD      L'|    A|
+        LDN     H'|  HEX 00 N,
+        PUSH    HL|
+        EXX
+        Next
+        C;
+
+
 ." (COMPARE) "
 \ this word performs a lexicographic compare of n bytes of text at address a1 
-\ with n bytes of text at address a2. It returns numeric a value 
+\ with n bytes of text at address a2. It returns numeric a value:
 \  0 : if strings are equal
 \ +1 : if string at a1 greater than string at a2 
 \ -1 : if string at a1 less than string at a2 
 \ strings can be 256 bytes in length at most.
 CODE (compare) ( a1 a2 n -- b )
+        EXX
         POP     HL| 
         LD      A'|    L|
-        POP     HL| 
-        POP     DE| 
-        PUSH    BC|
+        POP     HL|         \ string a2
+        POP     DE|         \ string a1
+        \ PUSH    BC|
         LD      B'|    A|
-        HERE
+        HERE                \ begin
 \           LDA(X)  DE| 
 \           CPA   (HL)|
             LD      A'|   (HL)|
@@ -945,22 +1028,26 @@ CODE (compare) ( a1 a2 n -- b )
             LD      C'|      A|
             LDA(X)  DE|
             CALL    upper^ AA,  \ uppercase routine
-            CPA      C|
+            CPA      C|         \ compare both uppercased chars
             INCX    DE| 
             INCX    HL|
-            JRF Z'| HOLDPLACE
+            JRF Z'| HOLDPLACE   \ match
                 JRF CY'| HOLDPLACE
-                      LDX  HL|  1 NN,
+                      LDX   HL|     1   NN,
                 JR   HOLDPLACE  SWAP HERE DISP, \ ELSE,
-                      LDX  HL| -1 NN,
+                      LDX   HL|    -1   NN,
                 HERE DISP, \ THEN,
-                POP BC| 
-                Psh1
+                PUSH    HL|
+                EXX  \ POP     BC| 
+                Next
+
             HERE DISP, \ THEN,
-        DJNZ BACK,
-        LDX HL| 0 NN,
-        POP BC| 
-        Psh1 
+
+        DJNZ BACK,          \ until
+        LDX     HL|     0   NN,
+        PUSH    HL|
+        EXX  \ POP     BC| 
+        Next
         C; 
 
 
@@ -974,13 +1061,24 @@ CODE emitc     ( c -- )
     HERE TO emitc^    
         PUSH    BC|
         PUSH    IX|
-        RST     10|             \ standard ROM
+        RST     10|             \ standard ROM current-channel print routine
         POP     IX|
         POP     BC|
         LDN     A'|  HEX FF N,
         LD()A   HEX 5C8C AA,    \ SCR-CT system variable
         Next
         C;
+
+
+\ 6396h
+.( CR )
+\ sends a CR via EMITC.
+CODE cr  ( -- )
+         
+        LDN     A'|     HEX 0D N,
+        JR      emitc^  HERE 1 +  - D, 
+        C;
+
 
 \ conversion table for (?EMIT)
 HERE TO EMIT-A^   
@@ -990,8 +1088,8 @@ HEX 06 C, \ comma
 HEX 07 C, \ bel
 HEX 08 C, \ bs
 HEX 09 C, \ tab
-HEX 0D C, \ cr
-HEX 0A C, \ nl --> cr
+HEX 0D C, \ cr --> cr
+HEX 0A C, \ lf Unix newline
 HEX 20 C, \ not used
 HEX 20 C, \ not used
 
@@ -1008,7 +1106,7 @@ CODE (?emit) ( c1 -- c2 )
         ANDN    HEX    7F N,  \ 7-bit ascii only
         PUSH    BC|            \ saves program counter
         LDX     BC|  EMIT-N  NN,
-        LDX     HL|  EMIT-C^ EMIT-N + 1 - NN, \ EMIT-Z^
+        LDX     HL|  EMIT-C^ EMIT-N + 1- NN, \ EMIT-Z^
         CPDR    \ search for c1 in EMIT-C table, backward
         
         JRF    NZ'|  HOLDPLACE    \ Found, decode it
@@ -1036,7 +1134,8 @@ CODE (?emit) ( c1 -- c2 )
     HERE TO EMIT-2^
         LD      L'|    A|
         LDN     H'| 0 N,
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 \ 06 comma-tab 
@@ -1053,7 +1152,8 @@ HERE    EMIT-A^ 02 +  !
         POP     IX|
         POP     BC|
         LDX     HL| 0 NN,          \ don't print anything
-        Psh1
+        PUSH    HL|
+        Next
 \       C;
 
 \ 08 tab        
@@ -1063,17 +1163,19 @@ EMIT-2^ EMIT-A^ 04 +  !
 HERE    EMIT-A^ 06 +  ! 
         ASSEMBLER 
         LDX     HL| 6 NN,
-        Psh1
+        PUSH    HL|
+        Next
 \       C;
 
 \ 0D cr        
 EMIT-2^ EMIT-A^ 08 +  !
 
-\ 0A nl --> cr        
-HERE    EMIT-A^ 0A +  !
+\ 0A nl --> cr
+HERE    EMIT-A^ 0A +  ! 
         ASSEMBLER 
         LDX     HL| 0D NN,
-        Psh1
+        PUSH    HL|
+        Next
 \       C;
 
 EMIT-2^ EMIT-A^ 0C +  !
@@ -1106,15 +1208,15 @@ HERE TO KEY-1^
     C6   C,   \  5: AND   --> SYMBOL+Y : [
     C5   C,   \  6: OR    --> SYMBOL+U : ]
     AC   C,   \  7: AT    --> SYMBOL+I : (C) copyright symbol
-    C7   C,   \  8: <=
-    C8   C,   \  9: >=
+    C7   C,   \  8: <=    --> SYMBOL+Q : same as SHIFT-1 [EDIT]
+    C8   C,   \  9: >=    --> SYMBOL+E : same as SHIFT-0 [BACKSPACE]
     C9   C,   \ 10: <>    --> SYMBOL+W is the same as CAPS (toggle) SHIFT+2 
 \ _________________
 
 HERE TO KEY-2^  \ same table in reverse order, sorry, I am lazy
     06   C,   \ 10: SYMBOL+W is the same as CAPS (toggle) SHIFT+2 
-    20   C,   \  9: not used
-    20   C,   \  8: not used
+    0C   C,   \  9: SYMBOL+E : same as SHIFT-0 [BACKSPACE]
+    07   C,   \  8: SYMBOL+Q : same as SHIFT-1 [EDIT]
     7F   C,   \  7: SYMBOL+I : (C) copyright symbol
     5D   C,   \  6: SYMBOL+U : ]
     5B   C,   \  5: SYMBOL+Y : [
@@ -1126,16 +1228,16 @@ HERE TO KEY-2^  \ same table in reverse order, sorry, I am lazy
 
 
 \ new
-.( KEY )
+.( CURS )
 \ display a flashing cursor then
 \ reads one character from keyboard stream and leaves it on stack
-CODE key ( -- c )
+CODE curs ( -- )
          
         PUSH    BC|
         PUSH    IX|
 
         LD()X   SP|    HEX 02C org^ +  AA, \ saves SP
-        LDX     SP|    HEX  -2 org^ +  NN, \ temp stack just below ORIGIN
+        LDX     SP|    HEX  -5 org^ +  NN, \ temp stack just below ORIGIN
 
         RES      5| (IY+ 1 )|
         HERE  \ BEGIN, 
@@ -1175,7 +1277,22 @@ CODE key ( -- c )
         LDN     A'| HEX 08 N,   \ backspace
         RST     10|
         
-        LDA()  HEX 5C08 AA,    \ get typed character
+        LDX()   SP|    HEX 02C org^ +  AA, \ restore SP
+
+        POP     IX|
+        POP     BC|
+        Next
+        C;
+
+
+CODE key ( -- )
+        PUSH    BC|
+
+        HERE  \ BEGIN, 
+            BIT      5| (IY+ 1 )|         \ FLAGS (5C3A+1)
+        JRF     Z'| HOLDPLACE SWAP DISP,  \ UNTIL, 
+
+        LDA()  HEX 5C08 AA,    \ LAST-K to get typed character
 
         \ Decode characters from above table
         LDX     HL|  KEY-1^    NN,
@@ -1200,50 +1317,104 @@ CODE key ( -- c )
         LD      L'|    A|
         LDN     H'|    0 N,
 
-        LDA()  HEX 5C48 AA,    \ BORDCR system variable
-        RRA
-        RRA
-        RRA
-        ORN     18 N,           \ quick'n'dirty click 
-        OUTA    HEX FE P,
-        LDN     B'|    0 N,
-        HERE \ BEGIN,
-        DJNZ    HOLDPLACE SWAP DISP, \ Wait loop
-        XORN    18 N,           \ click ?
-        OUTA    HEX FE P,
+        RES      5| (IY+ 1 )|
 
-        LDX()   SP|    HEX 02C org^ +  AA, \ restore SP
-
-        POP     IX|
         POP     BC|
-        Psh1
+        PUSH    HL|
+
+        Next
         C;
+
+
+\ CODE click ( -- )
+\ 
+\         PUSH    BC|
+\         LDA()  HEX 5C48 AA,    \ BORDCR system variable
+\         RRA
+\         RRA
+\         RRA
+\         ORN     18 N,           \ quick'n'dirty click 
+\         OUTA    HEX FE P,
+\         LDN     B'|    0 N,
+\         HERE \ BEGIN,
+\         DJNZ    HOLDPLACE SWAP DISP, \ Wait loop
+\         XORN    18 N,           \ click ?
+\         OUTA    HEX FE P,
+\         PUSH    BC|
+\ 
+\         Next
+\         C;
+
+
+\ CODE key? ( -- f )
+\         LDX     HL|  HEX 0000  NN,
+\         BIT      5| (IY+ 1 )|         \ FLAGS (5C3A+1)
+\         JRF     Z'|  HOLDPLACE  \ -IF,
+\             DECX    HL|
+\         HERE DISP, \ THEN,         
+\         PUSH    HL|
+\         Next
+\         C;
 
 
 \ 637Bh
 .( ?TERMINAL )
-\ Tests the terminal-break. Leaves tf if [SPACE/BREAK] is pressed, or ff.
-CODE ?terminal ( -- 0 | 1 ) ( true if BREAK-SPACE pressed )
-         
-        LDX     HL| 0 NN,
-        LD()X   SP|    HEX 02C org^ +  AA, \ saves SP
-        LDX     SP|    HEX  -2 org^ +  NN, \ temp stack just below ORIGIN
-        CALL    HEX 1F54 AA,
-        LDX()   SP|    HEX 02C org^ +  AA, \ restore SP
-        JRF    CY'| HOLDPLACE
-            INC     L'|
-        HERE DISP, \ THEN,
-        Psh1
+\ Tests the terminal-break. Leaves tf if [SHIFT-SPACE/BREAK] is pressed, or ff.
+CODE ?terminal ( -- 0 | -1 ) ( true if BREAK pressed )
+        EXX
+        LDX     BC|     HEX 7FFE NN,
+        IN(C)   D'|
+        LD      B'|     C|  \ FEFE
+        IN(C)   A'|
+        ORA      D|
+        RRA
+        CCF 
+        SBCHL   HL|
+        PUSH    HL|
+        EXX
+        Next
         C;
 
 
-\ 6396h
-.( CR )
-\ sends a CR via EMITC.
-CODE cr  ( -- )
+\ 7734h >>>
+.( INKEY )
+\ calls ROM inkey$ routine, returns c or "zero".
+CODE inkey ( -- c )
          
-        LDN     A'|     HEX 0D N,
-        JP      emitc^  AA,
+        PUSH    BC|
+        LD()X   SP|    HEX 02C org^ +  AA, \ saves SP
+        LDX     SP|    HEX  -5 org^ +  NN, \ temp stack just below ORIGIN
+        PUSH    IX|
+        CALL    HEX  15E6  AA,  ( instead of 15E9 )
+        POP     IX|
+        LDX()   SP|    HEX 02C org^ +  AA, \ restore SP
+        LD      L'|    A|
+        LDN     H'|    0 N,
+        POP     BC|
+        PUSH    HL|
+        Next
+        C;
+
+
+\ 7749h >>>
+.( SELECT )
+\ selects the given channel number
+\ #2 is keyboard or video
+\ #3 is printer or rs-232 i/o port (it depends on OPEN#3 from BASIC)
+\ #4 is depends on OPEN#4 from BASIC
+CODE select ( n -- )
+         
+        POP     HL|
+        PUSH    BC|
+        LD      A'|    L|
+        LD()X   SP|    HEX 02C org^ +  AA, \ saves SP
+        LDX     SP|    HEX  -5 org^ +  NN, \ temp stack just below ORIGIN
+        PUSH    IX|
+        CALL    HEX  1601 AA,
+        POP     IX|
+        LDX()   SP|    HEX 02C org^ +  AA, \ restore SP
+        POP     BC|
+        Next 
         C;
 
 
@@ -1254,17 +1425,16 @@ CODE cr  ( -- )
 \ The content of a1 is moved first. See CMOVE> also.
 CODE cmove ( a1 a2 nc -- )
          
-        LD      H'|    B|
-        LD      L'|    C|
+        EXX
         POP     BC|
         POP     DE|
-        EX(SP)HL 
+        POP     HL|
         LD      A'|    B|
         ORA      C|    
         JRF     Z'| HOLDPLACE
             LDIR  
         HERE DISP, \ THEN,
-        POP     BC|
+        EXX
         Next 
         C;
 
@@ -1276,11 +1446,10 @@ CODE cmove ( a1 a2 nc -- )
 \ The content of a1 is moved last. See CMOVE.
 CODE cmove> ( a1 a2 nc -- )
          
-        LD      H'|    B|
-        LD      L'|    C|
+        EXX
         POP     BC|
         POP     DE|
-        EX(SP)HL
+        POP     HL|
         LD      A'|    B|
         ORA      C|
         JRF     Z'| HOLDPLACE
@@ -1292,7 +1461,7 @@ CODE cmove> ( a1 a2 nc -- )
             DECX    HL|
             LDDR  
         HERE DISP, \ THEN,
-        POP     BC|
+        EXX
         Next 
         C;
 
@@ -1306,12 +1475,10 @@ CODE cmove> ( a1 a2 nc -- )
 \ so in the stack memory it appears as LHED.
 \ Instead, in 2VARIABLE a double number is stored as EDLH.
 CODE um* ( u1 u2 -- ud )
-        POP     DE|
-        POP     HL|
-        PUSH    BC|
 
-        LD      B'|    H|
-        LD      C'|    L|
+        EXX
+        POP     DE|
+        POP     BC|
         LDX     HL|    0 NN,
         LDN     A'|   DECIMAL 16 N,
         HERE \ BEGIN, 
@@ -1326,9 +1493,10 @@ CODE um* ( u1 u2 -- ud )
             HERE DISP, \ THEN,
             DEC     A'|
         JRF     NZ'|   HOLDPLACE  SWAP DISP, \ -UNTIL, 
-        EXDEHL
-        POP     BC|
-        Psh2
+        PUSH    HL|     \ low part
+        PUSH    DE|     \ high part
+        EXX
+        Next
         C;
 
 
@@ -1342,26 +1510,22 @@ CODE um* ( u1 u2 -- ud )
 \ each loop 'lowers' the next binary digit to form the current dividend
 CODE um/mod ( ud u1 -- r q )
          
-        LD      H'|    B|  \ save BC via EX(SP)HL later
-        LD      L'|    C|
+        EXX
         POP     BC|        \ divisor
-        POP     DE|        \ high part
-        EX(SP)HL           \ low part and save BC
-        EXDEHL             \ restore the fact a double number is kept as HLDE
+        POP     HL|        \ high part
+        POP     DE|        \ low part
         LD      A'|    L|  \ check without changing arguments
         SUBA     C|        \ if divisor is greater than high part
-        LD      A'|    H|  \ so quotient will be in range
+        LD      A'|    H|  \ then quotient won't be in range
         SBCA     B|
 
         JRF    NC'| HOLDPLACE
             LDN     A'| DECIMAL 16 N,
             
             HERE \ BEGIN, 
-                ANDA     A|
-                RL       E|
+                SLA      E|
                 RL       D|
-                RL       L|
-                RL       H|
+                ADCHL   HL|
 
                 JRF    NC'| HOLDPLACE
                     ANDA     A|
@@ -1381,8 +1545,10 @@ CODE um/mod ( ud u1 -- r q )
             \ until zero
             EXDEHL
         HERE SWAP                    \ strange jump here
-            POP     BC|
-            Psh2 
+            PUSH    DE|
+            PUSH    HL|
+            EXX
+            Next 
         HERE DISP, \ THEN,
         LDX     HL|    HEX FFFF NN,
         LD      D'|    H|
@@ -1404,7 +1570,8 @@ CODE and ( n1 n2 -- n3 )
         LD      A'|    D|
         ANDA     H|     
         LD      H'|    A|
-        Psh1 
+        PUSH    HL|
+        Next
         C;
 
 
@@ -1421,7 +1588,8 @@ CODE or  ( n1 n2 -- n3 )
         LD      A'|    D|
         ORA      H|     
         LD      H'|    A|
-        Psh1 
+        PUSH    HL|
+        Next
         C;
 
 
@@ -1438,7 +1606,8 @@ CODE xor ( n1 n2 -- n3 )
         LD      A'|    D|
         XORA     H|     
         LD      H'|    A|
-        Psh1 
+        PUSH    HL|
+        Next
         C;
 
 
@@ -1449,7 +1618,8 @@ CODE sp@ ( -- a )
          
         LDX     HL|    0 NN,
         ADDHL   SP|
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
@@ -1474,7 +1644,8 @@ CODE rp@ ( -- a )
         HERE !rp^ 
         LDHL,RP              \ macro 30h +Origin
 
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
@@ -1493,9 +1664,9 @@ CODE rp! ( a -- )
 
 
 \ 64D1h
-.( ;S )
+.( EXIT )
 \ exits back to the caller word
-CODE ;s ( -- )
+CODE exit ( -- )
 
         HERE !rp^ 
         LDHL,RP              \ macro 30h +Origin
@@ -1513,23 +1684,23 @@ CODE ;s ( -- )
 
 
 \ 64E5h
-.( LEAVE )
+\ .( lastl aka old LEAVE )
 \ set the limit-of-loop equal to the current index
 \ this forces to leave from loop at the end of the current iteration
-CODE leave ( -- )
-
-        HERE !rp^ 
-        LDHL,RP              \ macro 30h +Origin
-
-        LD      E'| (HL)|  
-        INCX    HL|
-        LD      D'| (HL)|  
-        INCX    HL|
-        LD   (HL)'|    E|  
-        INCX    HL|
-        LD   (HL)'|    D|
-        Next
-        C;       
+\ CODE lastl ( -- )
+\ 
+\         HERE !rp^ 
+\         LDHL,RP              \ macro 30h +Origin
+\ 
+\         LD      E'| (HL)|  
+\         INCX    HL|
+\         LD      D'| (HL)|  
+\         INCX    HL|
+\         LD   (HL)'|    E|  
+\         INCX    HL|
+\         LD   (HL)'|    D|
+\         Next
+\         C;       
 
 
 \ 64FCh
@@ -1576,19 +1747,29 @@ CODE r> ( -- n )
 
 
 \ 6526h
-.( R )
+.( R@ )
 \ return on top of stack the value of top of return-stack
 \ Since this is the same as I, we alter R's CFA to jump there
-CODE r ( -- n )         
+CODE r@ ( -- n )         
          
         \ this way we will have a real duplicate of I
-        ' i  >BODY  LATEST PFA CFA ! 
+
+        ' i  >BODY  LATEST PFA CELL- ! 
+
+        C;
+
+CODE r  ( -- n )         
+         
+        \ this way we will have a real duplicate of I
+
+        ' i  >BODY  LATEST PFA CELL- ! 
+
         C;
 
 
 \ 652Ch
 .( 0= )
-\ true (1) if n is zero, false (0) elsewere
+\ true (-1) if n is zero, false (0) elsewere
 CODE 0= ( n -- f )
          
         POP     HL|
@@ -1596,30 +1777,42 @@ CODE 0= ( n -- f )
         ORA      H|
         LDX     HL|    0 NN,
         JRF    NZ'|    HOLDPLACE
-            INC     L'|
+            DECX      HL|           \ true
         HERE DISP, \ THEN,
-        Psh1
+        PUSH    HL|
+        Next
+        C;
+
+
+.( NOT )
+CODE not  ( n -- f )         
+         
+        \ this way we will have a real duplicate of 0=
+
+        ' 0=  >BODY  LATEST PFA CELL- ! 
+
         C;
 
 
 \ 6540h
 .( 0< )
-\ true (1) if n is less than zero, false (0) elsewere
+\ true (-1) if n is less than zero, false (0) elsewere
 CODE 0< ( n -- f )
          
         POP     HL|
         ADDHL   HL|
         LDX     HL|    0 NN,
         JRF    NC'|    HOLDPLACE
-            INC     L'|
+            DECX      HL|           \ true
         HERE DISP, \ THEN,
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
 \ 6553h
 .( 0> )
-\ true (1) if n is greater than zero, false (0) elsewere
+\ true (-1) if n is greater than zero, false (0) elsewere
 CODE 0> ( n -- f )
          
         POP     HL|
@@ -1630,9 +1823,10 @@ CODE 0> ( n -- f )
         JRF    CY'|    HOLDPLACE    
         ANDA     A|
         JRF     Z'|    HOLDPLACE
-            INC     L'|
+            DECX      HL|           \ true
         HERE DISP, HERE DISP, \ THEN, THEN,
-        Psh1  
+        PUSH    HL|
+        Next
         C;
 
 
@@ -1644,7 +1838,8 @@ CODE + ( n1 n2 -- n3 )
         POP     HL|
         POP     DE|
         ADDHL   DE|
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
@@ -1657,24 +1852,17 @@ CODE + ( n1 n2 -- n3 )
 \ SP  +01234567
 CODE d+ ( d1 d2 -- d3 )
 
-        \ Load DE with (SP+6/7) and save BC there.
-        LDX     HL|   7 NN,
-        ADDHL   SP|
-        LD      D'| (HL)|
-        LD   (HL)'|    B|
-        DECX    HL|
-        LD      E'| (HL)|
-        LD   (HL)'|    C|      \ DE  = ld1
-
+        EXX
         POP     BC|            \ BC  = hd2
-        POP     HL|            \ HL  = ld2
-        ADDHL   DE|            \ HL  = ld1+ld2
-        EXDEHL                 \ DE  = ld1+ld2
+        POP     DE|            \ DE  = ld2 
         POP     HL|            \ HL  = hd1
+        EX(SP)HL               \ HL  = ld1
+        ADDHL   DE|            \ HL  = ld1+ld2
+        EX(SP)HL               \ HL  = hd1
         ADCHL   BC|            \ HL  = hd1+hd2
-
-        POP     BC|            \ retrieve BC
-        Psh2
+        PUSH    HL|
+        EXX
+        Next
         C;
 
 
@@ -1685,7 +1873,8 @@ CODE 1+ ( n1 -- n2 )
          
         POP     HL|
         INCX    HL|
-        Psh1 
+        PUSH    HL|
+        Next
         C;
         
 
@@ -1696,7 +1885,8 @@ CODE 1-  ( n1 -- n2 )
          
         POP     HL|
         DECX    HL|
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
@@ -1709,74 +1899,86 @@ CODE 2+ ( n1 -- n2 )
         POP     HL|
         INCX    HL|
         INCX    HL|
-        Psh1 
-        C;
-
-
-.( CELL+ )
-\ increment by 1 top of stack
-CODE cell+ ( n1 -- n2 )
-         
-        \ this way we will have a real duplicate of 2+
-        ' 2+  >BODY  LATEST PFA CFA ! 
-        C;
-
-
-.( ALIGN )
-CODE align ( a1 -- a2 )
+        PUSH    HL|
         Next
         C;
 
 
+.( CELL+ )
+\ increment by 1 top of stack 
+CODE cell+ ( n1 -- n2 )
+         
+        \ this way we will have a real duplicate of 2+
+
+        ' 2+  >BODY  LATEST PFA CELL- ! 
+
+        C;
+
+
+\ .( ALIGN )
+\ CODE align ( a1 -- a2 )
+\         Next
+\         C;
+
+
 .( CELL- )
+\ decrement by 2 top of stack 
 CODE cell- ( n1 -- n2 )
 
-        POP     HL|         \ address
+        POP     HL|         \ address 
         DECX    HL|
         DECX    HL|
-        Psh1
+        PUSH    HL|
+        Next
+        C;
+
+
+.( 2- )
+\ decrement by 2 top of stack 
+CODE 2- ( n1 -- n2 )
+         
+        \ this way we will have a real duplicate of 2+
+
+        ' cell-  >BODY  LATEST PFA CELL- ! 
+
         C;
 
 
 \ 658Bh
-.( MINUS   ( or NEGATE )
+.( NEGATE   ( or MINUS )
 \ change the sign of number
-CODE minus ( n1 -- n2 )
+CODE negate ( n1 -- n2 )
          
         LDX     HL|    0 NN,
         POP     DE|
         ORA      A|
         SBCHL   DE|
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
 \ 659Fh
-.( DMINUS   ( or DNEGATE )
+.( DNEGATE   ( or DMINUS )
 \ change the sign of a double number
 \ SP : LHED
 \ SP :+0123
-CODE dminus ( d1 -- d2 )
+CODE dnegate ( d1 -- d2 )
 
-        POP     HL|            \ hd1
+        EXX
+        POP     BC|            \ hd1
         POP     DE|            \ ld1
-        PUSH    BC|
-        LD      B'|    H|
-        LD      C'|    L|
         XORA     A|
         LD      H'|    A|
         LD      L'|    A|
         SBCHL   DE|
-
-        POP     DE|
         PUSH    HL|
-
         LD      H'|    A|
         LD      L'|    A|
         SBCHL   BC|
-        LD      B'|    D|
-        LD      C'|    E|
-        Psh1
+        PUSH    HL|
+        EXX
+        Next
         
         C;
 
@@ -1787,10 +1989,12 @@ CODE dminus ( d1 -- d2 )
 \ copy the second value of stack and put on top.
 CODE over ( n m -- n m n )
          
-        POP     DE|   \  m
-        POP     HL|   \  n
+        POP     DE|   \  DE <-- m
+        POP     HL|   \  HL <-- n
         PUSH    HL|
-        Psh2
+        PUSH    DE|
+        PUSH    HL|
+        Next
         C;
 
 
@@ -1818,10 +2022,12 @@ CODE nip  ( n1 n2 -- n2 )
 \ Copies the top element after the second.
 CODE tuck  ( n1 n2 -- n2 n1 n2 )
 
-        POP     HL|
-        POP     DE|
+        POP     HL|     \ HL <-- n2
+        POP     DE|     \ DE <-- n1
         PUSH    HL|
-        Psh2
+        PUSH    DE|
+        PUSH    HL|
+        Next
         C;
 
 
@@ -1832,7 +2038,8 @@ CODE swap ( n1 n2 -- n2 n1 )
          
         POP     HL|
         EX(SP)HL
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
@@ -1843,7 +2050,8 @@ CODE dup ( n -- n n )
          
         POP     HL|
         PUSH    HL|
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
@@ -1856,12 +2064,31 @@ CODE rot ( n1 n2 n3  -- n2 n3 n1 )
         POP     DE|  \ n3
         POP     HL|  \ n2
         EX(SP)HL     \ n1 <-> n2
-        Psh2         \ n3, n2
+        PUSH    DE|  \ n3, n2
+        PUSH    HL|
+        Next
+        C;
+
+
+.( -ROT )
+\ Rotates the 3 top values of stack by picking the 1st in access-order
+\ and putting back to 3rd place. The other two are shifted down one place.
+CODE -rot ( n1 n2 n3  -- n3 n1 n2 )
+         
+        POP     HL|  \ n3
+        POP     DE|  \ n2
+        EX(SP)HL     \ n1 <-> n3
+        PUSH    HL|  \ n1
+        PUSH    DE|  \ n2
+        Next
         C;
 
 
 .( PICK )
-\ picks the nth element from TOS
+\ Duplicate the nth item on the stack to the top of the stack.
+\ Zero based, that is the top item on the stack is the zeroth item,
+\ the one below that is the first item and so on. (O PICK has the
+\ same effect as DUP, 1 PICK the same as OVER).
 CODE pick ( n -- v )
 
         POP     HL| 
@@ -1871,7 +2098,45 @@ CODE pick ( n -- v )
         INCX    HL|
         LD      H'| (HL)|
         LD      L'|    A|
-        Psh1         
+        PUSH    HL|
+        Next
+        C;
+
+
+\ .( ROLL )
+\ Roll the nth item to the top of the stack, moving the others
+\ down. Also zero based, (eg., 1 ROLL is SWAP, 2 ROLL is ROT).
+\        N0 N1 N2 N3
+\ SP    +01 23 45 67
+\         HL DE
+CODE roll ( n1 n2 n3 ... n -- n2 n3 ... n1  )
+
+        EXX                     \ we need all registers free
+        POP     HL|             \ number of cells to roll
+        LD      A'|    H|
+        ORA      L|
+        JRF     Z'|  HOLDPLACE  \ skip if ZERO
+            ADDHL   HL|             \ number of bytes to move
+            LD      B'|    H|
+            LD      C'|    L|
+            ADDHL   SP|             \ address of n1
+            LD      A'| (HL)|       \ keep low-byte of n1 into A and A'
+            INCX    HL|             \ hl points the top byte to be rolled
+            EXAFAF
+            LD      A'| (HL)|       \ keep high-byte of n1 into A and A'
+            LD      D'|    H|       \ de points the top byte to be rolled
+            LD      E'|    L|
+            DECX    HL|
+            DECX    HL|             \ hl is two bytes below
+            LDDR                    \ move area up starting from top address
+            EXDEHL                  \ at end, hl points the high byte of TOS
+            LD   (HL)'|    A|       \ restore low-byte of n1 in TOS
+            DECX    HL|
+            EXAFAF
+            LD   (HL)'|    A|       \ restore high-byte of n1 in TOS
+        HERE DISP,
+        EXX
+        Next
         C;
 
 
@@ -1930,7 +2195,9 @@ CODE 2dup  ( d -- d d )
         POP     DE|
         PUSH    DE|
         PUSH    HL|
-        Psh2
+        PUSH    DE|
+        PUSH    HL|
+        Next
         C;
 
 
@@ -1942,38 +2209,24 @@ CODE 2dup  ( d -- d d )
 \ SP  +0123|4567|89ab|
 CODE 2rot  ( d1 d2 d3 -- d2 d3 d1 )
         
-        LDX     HL|  HEX 000B NN,
-        ADDHL   SP|
-        LD      D'| (HL)|
-        DECX    HL|
-        LD      E'| (HL)|
-        DECX    HL|
-        PUSH    DE|
-        LD      D'| (HL)|
-        DECX    HL|
-        LD      E'| (HL)|
-        DECX    HL|
-        PUSH    DE|
-
-\      d1  |d3  |d2  |d1  |
-\      h l |h l |h l |h l |
-\ SP   LHED|LHED|LHED|LHED|
-\ SP       +0123|4567|89ab|
-
-        LD      D'|    H|
-        LD      E'|    L|
-        INCX    DE|
-        INCX    DE|
-        INCX    DE|
-        INCX    DE|
-        PUSH    BC|
-        LDX     BC|  HEX 000C NN,
-        LDDR        
-        POP     BC|
-        POP     DE|
-        POP     DE|
-        Next
-        C;
+       EXX
+       POP     HL|      \ d3
+       POP     DE|
+       POP     BC|      \ d2
+       POP     AF|
+       EXX
+       POP     HL|      \ d1
+       POP     DE|
+       EXX
+       PUSH    AF|      
+       PUSH    BC|      \ d2
+       PUSH    DE|
+       PUSH    HL|      \ d3
+       EXX
+       PUSH    DE|      
+       PUSH    HL|      \ d1
+       Next
+       C;
 
 
 \ 6603h
@@ -2047,7 +2300,8 @@ CODE c@ ( a -- c )
         POP     HL|
         LD      L'| (HL)|
         LDN     H'|    0 N,
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
@@ -2072,9 +2326,6 @@ CODE c! ( c a -- )
 \ where HL is on the top of the stack and DE is the second from top,
 \ so the sign of the number can be checked on top of stack
 \ and in the stack memory it appears as LHED.
-\ Instead, a 32 bits number d is kept in memory as EDLH
-\ with the lowest significant word in the lower location
-\ and the highest significant word in the higher location.
 CODE 2@ ( a -- d )
          
         POP     HL|
@@ -2086,7 +2337,9 @@ CODE 2@ ( a -- d )
         INCX    HL|
         LD      H'| (HL)|
         LD      L'|    A|
-        Psh2
+        PUSH    HL|
+        PUSH    DE|
+        Next
         C;
 
 
@@ -2099,33 +2352,20 @@ CODE 2@ ( a -- d )
 \ where HL is on the top of the stack and DE is the second from top,
 \ so in the stack memory it appears as LHED.
 \ and the sign of the number can be checked on top of stack.
-\ Instead, a 32 bits number d is kept in memory as EDLH
-\ with the lowest significant word in the lower location
-\ and the highest significant word in the higher location.
 CODE 2! ( d a -- )
 
-        LD      H'|    B|
-        LD      L'|    C|
-
-        POP     DE|        \ address
-        POP     BC|        \ highest
-
-        EX(SP)HL           \ lowest
-        EXDEHL
-
+        EXX
+        POP     HL|        \ address
+        POP     BC|        \ higher
+        POP     DE|        \ lower
+        LD   (HL)'|    C|
+        INCX    HL|
+        LD   (HL)'|    B|
+        INCX    HL|
         LD   (HL)'|    E|
         INCX    HL|
         LD   (HL)'|    D|
-
-        INCX    HL|
-
-        LD   (HL)'|    C|
-        INCX    HL|
-
-        LD   (HL)'|    B|
-
-        POP     BC|
-
+        EXX
         Next
         C;
 
@@ -2135,17 +2375,13 @@ CODE 2! ( d a -- )
 \ Read one byte from port ap and leave the result on top of stack
 CODE p@ ( p -- b )
          
-        LD      D'|    B|
-        LD      E'|    C|
-
+        EXX
         POP     BC|
         LDN     H'|  0 N,
         IN(C)   L'|
-
-        LD      B'|    D|
-        LD      C'|    E|
-
-        Psh1
+        PUSH    HL|
+        EXX
+        Next
         C;
 
 
@@ -2155,16 +2391,11 @@ CODE p@ ( p -- b )
 \ Send one byte (top of stack) to port ap 
 CODE p! ( b p -- )
          
-        LD      D'|    B|
-        LD      E'|    C|
-
+        EXX
         POP     BC|
         POP     HL|
         OUT(C)  L'|
-
-        LD      B'|    D|
-        LD      C'|    E|
-
+        EXX
         Next
         C;
 
@@ -2176,7 +2407,8 @@ CODE 2* ( n1 -- n2 )
          
         POP     HL|
         ADDHL   HL|
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
@@ -2188,7 +2420,8 @@ CODE 2/ ( n1 -- n2 )
         POP     HL|
         SRA      H|
         RR       L|
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
@@ -2207,7 +2440,8 @@ CODE lshift ( n1 u -- n2 )
                 DEC     A'|
             JRF    NZ'| HOLDPLACE SWAP DISP,
         HERE DISP, \ THEN,
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
@@ -2227,14 +2461,17 @@ CODE rshift ( n1 u -- n2 )
                 DEC     A'|
             JRF    NZ'| HOLDPLACE SWAP DISP,
         HERE DISP, \ THEN,
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
 .( CELLS )
 CODE cells ( n2 -- n2 )
         \ this way we will have a real duplicate of 2*
-        ' 2*  >BODY  LATEST PFA CFA ! 
+
+        ' 2*  >BODY  LATEST PFA CELL- ! 
+
         C;
 
 
@@ -2247,7 +2484,7 @@ CODE cells ( n2 -- n2 )
     CURRENT  @ 
     CONTEXT  ! 
     CREATE  
-    SMUDGE \ old has no smudge, new has smudge
+    SMUDGE 
     ] 
     ;CODE
 
@@ -2265,7 +2502,7 @@ CODE cells ( n2 -- n2 )
         LDRP,HL              \ macro 30h +Origin
         
         INCX    DE|          \ this depends on how inner interpreter works
-        LD      C'|    E|
+        LD      C'|    E|    \ Indirect-Thread version
         LD      B'|    D|
         Next
         C;
@@ -2274,14 +2511,14 @@ CODE cells ( n2 -- n2 )
     \ we defined this peculiar word using "old" colon definition 
     \ behaviour. Now we want to use the ;CODE just coded.
     
-    enter^  LATEST PFA CFA !  \ patch to the correct ;CODE
+    enter^  LATEST PFA CELL- !  \ patch to the correct ;CODE
 
      
 \ 66B2h
 .( ; ) \ ___ late-patch ___ 
 : ; 
     ?CSP
-    COMPILE   ;s     
+    COMPILE   exit   
     SMUDGE 
     [COMPILE] [    \ previous version
     ;
@@ -2290,8 +2527,9 @@ CODE cells ( n2 -- n2 )
 
 \ 66C4h
 .( NOOP )
-: noop ( -- )
-    ;
+CODE noop ( -- )
+        Next
+        C;
 
 
 \ 66CFh
@@ -2299,7 +2537,7 @@ CODE cells ( n2 -- n2 )
 : constant ( n ccc --   )
            (       -- n )
     CREATE , 
-    \ SMUDGE \ old has smudge, new has no smudge
+    \ SMUDGE 
     ;CODE
         INCX    DE|
         EXDEHL
@@ -2313,9 +2551,9 @@ CODE cells ( n2 -- n2 )
 
 \ 66EDh
 .( VARIABLE ) \ ___ late-patch ___ only for ;CODE
-: variable ( n ccc --   )
+: variable (   ccc --   )
            (       -- n )
-    constant
+    0 constant
     ;CODE
         INCX    DE|
         PUSH    DE|
@@ -2328,7 +2566,7 @@ CODE cells ( n2 -- n2 )
 : user ( n ccc --   )
        (       -- n )
     CREATE  C,
-    \ SMUDGE \ old has smudge, new has no smudge
+    \ SMUDGE 
     ;CODE
         INCX    DE|
         EXDEHL
@@ -2337,7 +2575,8 @@ CODE cells ( n2 -- n2 )
     \   LDX     HL| vars^ @ NN,
         LDHL()  vars^ AA,       \ this is more dynamic...
         ADDHL   DE|
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
@@ -2402,8 +2641,15 @@ L/SCR constant l/scr
 
 \ 67B0h
 .( +ORIGIN )
-: +origin
-    [ org^ ] Literal + ;
+\ : +origin
+\     [ org^ ] Literal + ;
+CODE +origin ( n1 -- n2 )
+        POP     HL|
+        LDX     DE|  org^  NN,
+        ADDHL   DE|
+        PUSH    HL|
+        Next
+        C;
 
     
 ." (NEXT) "
@@ -2447,10 +2693,11 @@ DECIMAL
   56     user    hld       \ last character during a number conversion output
   58     user    use       \ address of last used block
   60     user    prev      \ address of previous used block
-  62     user    lp        \ line printer (not used)
+  62     user    lp        \ Case Pointer...    
   64     user    place     \ number of digits after decimal point in output
   66     user    source-id \ data-stream number in INCLUDE and LOAD-
-  68     user    span      \ number of character of last EXPECT
+  68     user    span      \ number of character of last ACCEPT
+  70     user    handler   \ throw-catch handler
   
   
 \ 1+  has moved backward
@@ -2478,7 +2725,7 @@ DECIMAL
     2 allot
     ;
 
-    
+
 \ 6940h    
 .( C, )
 : c,  ( c -- )
@@ -2488,9 +2735,9 @@ DECIMAL
 
 
 \ 754Ch
-.( S->D )
+.( S>D )
 \ converts a single precision integer in a double precision
-CODE s->d   ( n -- d )
+CODE s>d   ( n -- d )
         POP     DE|
         LDX     HL|    0 NN,
         LD      A'|    D|
@@ -2498,7 +2745,9 @@ CODE s->d   ( n -- d )
         JRF     Z'|    HOLDPLACE \ IF,
         DECX    HL|
         HERE DISP, \ THEN, 
-        Psh2
+        PUSH    DE|
+        PUSH    HL|
+        Next
         C;
 
 
@@ -2511,7 +2760,8 @@ CODE - ( n1 n2 -- n3 )
         POP     HL|
         ANDA     A|
         SBCHL   DE|
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
@@ -2524,44 +2774,44 @@ CODE - ( n1 n2 -- n3 )
 
 \ 6987h
 .( U< )
-\ true (1) if unsigned u1 is less than u2.
+\ true (-1) if unsigned u1 is less than u2.
 CODE u< ( u1 u2 -- f )
         POP     DE|
         POP     HL|
         ANDA     A|
         SBCHL   DE|
-        LDX     HL| 1 NN,
+        LDX     HL| -1 NN,          \ true
         JRF    CY'| HOLDPLACE
-            DEC     L'|
+            INCX     HL|
         HERE DISP, \ THEN,
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
 \ 696Bh
 .( < )
+\ true (-1) if n1 is less than n2
 CODE <  ( n1 n2 -- f )
         POP     DE|
         POP     HL|
-        LD      A'|  H|
+        LD      A'|   H|
         XORN    HEX 80   N,  DECIMAL
-        LD      H'|  A|
-        LD      A'|  D|
+        LD      H'|   A|
+        LD      A'|   D|
         XORN    HEX 80   N,  DECIMAL
-        LD      D'|  A|
-        ANDA     A|
-        SBCHL   DE|
-        LDX     HL| 1 NN,
-        JRF    CY'| HOLDPLACE
-            DEC     L'|
-        HERE DISP, \ THEN,
-        Psh1
+        LD      D'|   A|
+        SBCHL   DE|     \ set carry-flag if n1 < n2
+        SBCHL   HL|     \ HL is zero or -1 depending on carry-flag
+        PUSH    HL|
+        Next
         C;
         
 
 
 \ 699Dh
 .( > )
+\ true (-1) if n1 is greater than n2
 : >   ( n1 n2 -- f )
     swap < 
     ; 
@@ -2572,7 +2822,7 @@ CODE <  ( n1 n2 -- f )
     2dup 
     > If 
         swap
-    Endif \ Then
+    Then \ Then
     drop
     ;
 
@@ -2582,7 +2832,7 @@ CODE <  ( n1 n2 -- f )
     2dup
     < If 
         swap
-    Endif \ Then
+    Then \ Then
     drop
     ;
 
@@ -2592,36 +2842,38 @@ CODE <  ( n1 n2 -- f )
 
 
 \ 69C7h
-.( -DUP )
-\ ?DUP  
+.( ?DUP )
+\ ?DUP 
 \ duplicate if not zero
-CODE -dup ( n -- 0 | n n )
+CODE ?dup ( n -- 0 | n n )
         POP     HL|
         LD      A'|    H|
         ORA      L|
         JRF Z'|   HOLDPLACE \ IF,
             PUSH    HL|
         HERE DISP, \ THEN, 
-        Psh1
+        PUSH    HL|
+        Next
         C;
 
 
-.( ?DUP ) \ is as -DUP
-CODE ?dup ( n -- 0 | n n )
-        \ This way we will have a real duplicate of -DUP.
-        C;
+.( -DUP ) \ is as -DUP
+CODE -dup ( n -- 0 | n n )
+        \ This way we will have a real duplicate of ?DUP.
 
-        ' -dup >BODY   LATEST  PFA CFA !
+        ' ?dup >BODY   LATEST  PFA CELL- !
+
+        C;
 
 
 \ 62CFh <<< moved here because of OUT
 .( EMIT )
 : emit  ( c -- )
     (?emit)
-    -dup If 
+    ?dup If 
         emitc
         1 out +!
-    Endif
+    Then
     ;
 
 
@@ -2648,7 +2900,7 @@ CODE ?dup ( n -- 0 | n n )
         [ DECIMAL 127 ] Literal
         over c@ <
     Until
-    swap drop
+    nip
     ;
 
 
@@ -2722,7 +2974,7 @@ CODE ?dup ( n -- 0 | n n )
         ERROR   \ forward 
     Else
         drop
-    Endif \ Then
+    Then \ Then
     ;
 
 
@@ -2777,6 +3029,13 @@ CODE ?dup ( n -- 0 | n n )
     ?comp
     r> dup cell+ >r
     @ ,
+    ;
+
+
+.( COMPILE, )
+: compile, ( xt -- )
+    ?comp 
+    ,
     ;
 
 
@@ -2835,7 +3094,12 @@ CODE ?dup ( n -- 0 | n n )
 : (;code)  ( -- )
     r>
     latest pfa cfa !
+
+
+
+
     ;
+    DECIMAL
 
 
 \ 6bb7
@@ -2862,25 +3126,25 @@ CODE ?dup ( n -- 0 | n n )
     ;
 
 
-.( RECURSE )
-: recurse
-    ?comp
-    latest pfa cfa ,
-    ; 
-    immediate
+\ .( RECURSE )
+\ : recurse
+\     ?comp
+\     latest pfa cfa ,
+\     ; 
+\     immediate
 
 
 \ 6BDFh
 .( DOES> )
 : does>    ( -- ) 
-    r>
-    latest pfa !
+    r>                       \ at compile-time, address of word after DOES>
+    latest pfa !             \ is put in PFA of LATEST defined word 
     ;code 
 
         HERE !rp^ 
         LDHL,RP              \ macro 30h +Origin
 
-        DECX    HL| 
+        DECX    HL|          \ save current IP just like an ENTER
         LD   (HL)'|    B|
         DECX    HL|
         LD   (HL)'|    C|
@@ -2888,32 +3152,69 @@ CODE ?dup ( n -- 0 | n n )
         HERE !rp^
         LDRP,HL              \ macro 30h +Origin
         
-        INCX    DE|
-        EXDEHL 
-        LD      C'| (HL)|
+        INCX    DE|          \ this is PFA of defined word that keeps the
+        EXDEHL               \ address of words after DOES> part
+        LD      C'| (HL)|    \ Use it as new IP to execute DOES> part
         INCX    HL|
         LD      B'| (HL)|
-        INCX    HL|
-        Psh1
+        INCX    HL|          \ now this is PFA+2 which is passed to DOES> part. 
+        PUSH    HL|          \ Puts on TOS the PFA+2 of LATEST defined word    
+        Next
         
     smudge
 
 
 \ 6C06h         
 .( COUNT )
-: count  ( a1 -- a2 n )
-    dup 
-    1+ swap c@ 
-    ;
+CODE count ( a1 -- a2 n )   
+
+        POP     HL|
+        LD      E'| (HL)|
+        LDN     D'|     0   N,
+        INCX    HL|
+HERE        
+        PUSH    HL|
+        PUSH    DE|
+        Next
+        C;
+
+
+.( BOUNDS )
+CODE bounds  ( a n -- a+n a )
+\ given an address and a length ( a n ) calculate the bound addresses
+\ suitable for DO-LOOP
+        POP     HL|          \ hl := n
+        POP     DE|          \ de := a
+        ADDHL   DE|          \ hl := a+n
+        JR      BACK,        \ jump to "HERE" on COUNT 
+        C;
+
+
+.( LEAVE )
+: leave ( -- )
+    compile (leave)         \ unloop and branch
+    here >r 0 ,             \ save HERE and compile placeholder
+    0 0                     \ dummy stack entry.
+                            \ rotate stack from csp to sp.
+    sp@ dup cell+ cell+     ( csp h 0 h 3 h 2 x x sp sp+4 )
+    tuck                    
+    csp @ swap -            ( csp h 0 h 3 h 2 x x sp+4 sp csp-sp+4 )
+    cmove                   ( csp x x h 0 h 3 h 2 )
+    csp @ cell-             
+                            \ put saved HERE at csp-2 
+    r> over !               ( csp H x h 0 h 3 h 2 )
+    cell- 0 swap !          ( csp H 0 h 0 h 3 h 2 )
+; immediate    
 
 
 \ 6C1Ah
 .( TYPE )
 \ Sends to current output channel n characters starting at address a.
 : type   ( a n -- )
-    over + swap
+    bounds
     ?Do
         i c@ emit
+        \ ?terminal If leave Then
     Loop
     ;
 
@@ -2925,14 +3226,14 @@ CODE ?dup ( n -- 0 | n n )
 \ Finds n2 as the position of the first character after the word.
 : -trailing ( a n1 -- a n2 )
     dup 0
-    Do
+    ?Do
         2dup + 1-
         c@ bl -
         If
             leave
         Else
             1-
-        Endif \ Then
+        Then \ Then
     Loop 
     ;
 
@@ -2944,8 +3245,9 @@ CODE ?dup ( n -- 0 | n n )
 \ n2 is the string length. n2 is kept in span user variable also.
 : accept ( a n1 -- n2 )
     over + over   ( a  n1+a a       ) 
-    0 rot rot     ( a  0    a+n1  a ) 
-    Do            ( a  0 ) 
+    0 -rot        ( a  0    a+n1  a ) 
+    ?Do           ( a  0 ) 
+        curs
         drop key  ( a  c ) 
         dup       ( a  c  c )
         [ hex 0E ] Literal +origin 
@@ -2955,13 +3257,14 @@ CODE ?dup ( n -- 0 | n n )
 
             drop        ( a )
             dup i =     ( a a=i )
+            1 and
             dup         ( a a=i a=i )
-            r> 2 - + >r  \ decrement i by 1 or 2.
+            r> 2- + >r  \ decrement i by 1 or 2.
             If
                 [ decimal 7 ] Literal  ( a 7 )
             Else
                 [ decimal 8 ] Literal  ( a 8 )
-            Endif
+            Then
 
         Else
 
@@ -2971,34 +3274,35 @@ CODE ?dup ( n -- 0 | n n )
             If 
                 drop bl ( a  bl )
                 0       ( a  c  0 )
-                leave
+                \ lastl
             Else 
                 dup     ( a  c  c )
-            Endif
-            
+            Then
+
             i c!        ( a  c )
             dup bl <    ( a  c  c<BL )  \ patch ghost word
             If
-                r> 1 - >r  
-            Endif
+                r> 1- >r  
+            Then
 
-        Endif
+        Then
 
         emit
         
         0 i 1+ ! \ zero pad
         i 
+        i c@ 0= If leave Then
     Loop 
     swap - 1+ 
     dup span ! 
     ;
 
 
-\ 6CC3h
-.( EXPECT )
-: expect ( a n -- )
-    accept drop
-    ;
+\ \ 6CC3h
+\ .( EXPECT )
+\ : expect ( a n -- )
+\     accept drop
+\     ;
 
 
 \ 6D40h
@@ -3008,7 +3312,7 @@ CODE ?dup ( n -- 0 | n n )
 : query ( -- )
     tib @ 
     [ decimal 80 ] Literal
-    expect
+    accept drop  
     0 >in ! 
     ;
 
@@ -3018,11 +3322,11 @@ CODE ?dup ( n -- 0 | n n )
 \ If n > 0, fills n locations starting from address a with the value c.
 CODE fill ( a n c -- )
          
-        LD      L'|    C|
-        LD      H'|    B|
+        EXX
+
         POP     DE|       \ we need E register only
         POP     BC|
-        EX(SP)HL
+        POP     HL|
         HERE  \ BEGIN, 
             LD      A'|    B|
             ORA      C|
@@ -3032,7 +3336,7 @@ CODE fill ( a n c -- )
             INCX    HL|
         \ REPEAT     
         JR HOLDPLACE ROT DISP, HERE DISP, 
-        POP     BC|
+        EXX
         Next
         C;
 
@@ -3083,7 +3387,7 @@ CODE fill ( a n c -- )
 \ Other occurrences of c are ignored.
 \ If BLK is zero, text is taken from terminal buffer TIB.
 \ Otherwise text is taken from the disk-block given by BLK.
-\ "in" variable is incremented of the number of character read.
+\ ">in" variable is incremented of the number of character read.
 \ The number of characters read is given by ENCLOSE.
 : word  ( c -- a )
     blk @ 
@@ -3095,13 +3399,13 @@ CODE fill ( a n c -- )
         BLOCK
     Else
         tib @
-    Endif \ Then
+    Then \ Then
     >in @ + 
     swap enclose
     here [ decimal 34 ] Literal blanks
     >in +!
     over - >r
-    r here c!
+    r@ here c!
     +
     here 1+ r> cmove 
     here  \  bl word
@@ -3113,7 +3417,7 @@ CODE fill ( a n c -- )
 \ Direct procedure compiled by ." and  .(
 \ It executes TYPE.
 : (.")
-    r count dup 1+
+    r@ count dup 1+
     r> + >r
     type
     ;
@@ -3131,8 +3435,8 @@ CODE fill ( a n c -- )
 
 \ new
 .( ," )
-\ compiles a string terminated by " as a counted string
-\ from next input stream
+\ read text from input stream until a " in encontered and 
+\ compiles a string as a "counted string" appending a trailing 0x00
 : ," ( -- )
     [ CHAR " ] Literal word
     c@ 1+ allot
@@ -3153,7 +3457,7 @@ CODE fill ( a n c -- )
     Else
 \       word here count type
         word      count type
-    Endif \ Then
+    Then \ Then
     ; 
     immediate
 
@@ -3177,87 +3481,90 @@ CODE fill ( a n c -- )
 \ )
 
 
-\ \ ______________________________________________________________________
+\ ______________________________________________________________________
+
+\ A floating point number is stored in stack in 4 bytes (HLDE) 
+\ instead of the usual 5 bytes, so there is a little precision loss
+\ Maybe in the future we'll be able to extend and fix this fact.
+\
+\ Sign is the msb of H, so you can check for sign in the integer-way.
+\ Exponent +128 is stored in the following 8 bits of HL
+\ Mantissa is stored in L and 16 bits of DE. B is defaulted.
 \ 
-\ \ A floating point number is stored in stack in 4 bytes (HLDE) 
-\ \ instead of the usual 5 bytes, so there is a little precision loss
-\ \ Maybe in the future we'll be able to extend and fix this fact.
-\ \
-\ \ Sign is the msb of H, so you can check for sign in the integer-way.
-\ \ Exponent +128 is stored in the following 8 bits of HL
-\ \ Mantissa is stored in L and 16 bits of DE. B is defaulted.
-\ \ 
-\ \ A floating point number is stored in Spectrum's calculator stack as 5 bytes.
-\ \ Exponent in A, sign in msb of E, mantissa in the rest of E and DCB.
-\ \  H   <->  A    # 0   -> a
-\ \  LDE <->  EDC  # 0DE -> eCD
-\ \  0   <->  B    # 0
-\ 
-\ \ 6E11h
-\ \ >W    ( d -- )
-\ \ takes a double-number from stack and put to floating-pointer stack 
-\ CODE >w
-\         POP     HL|     
-\         POP     DE|     
-\         PUSH    BC|     
-\         RL       L|         \ To keep sign as the msb of H,   
-\         RL       H|         \ so you can check for sign in the
-\         RR       L|         \ integer-way. Sorry.
-\         LDN     B'|    hex C0 N,  
-\ \       LD      B'|    E|    \ maybe a better fit than C0h
-\         LD      C'|    E|    
-\         LD      E'|    L|    
-\         LD      A'|    H|    
-\         ANDA     A|
-\         JRF    NZ'|   HOLDPLACE
-\             LD      H'|    D|  \ swap C and D 
-\             LD      D'|    C|
-\             LD      C'|    H|
-\         HERE DISP, \ THEN,       
-\         CALL    hex 2AB6 AA,
-\         POP     BC|
-\         Next
-\         C;
-\ 
-\ 
-\ \ 6E33h
-\ \ W>    ( -- d )
-\ \ takes a double-number from stack and put to floating-pointer stack 
-\ CODE w>
-\         PUSH    BC|     
-\         CALL    hex 2BF1 AA,
-\         ANDA     A|
-\         JRF    NZ'|   HOLDPLACE
-\             LD      H'|    D|   \ Swap C and D
-\             LD      D'|    C|
-\             LD      C'|    H|
-\         HERE DISP, \ THEN,       
-\         LD      H'|    A|
-\         LD      L'|    E|
-\         LD      E'|    C|    \ B is lost precision
-\         RL       L|         \ To keep sign as the msb of H,
-\         RR       H|         \ so you can check for sign in the 
-\         RR       L|         \ integer-way. Sorry.
-\         POP     BC|
-\         Psh2
-\         C;
-\ 
-\ 
-\ \ 6E51h
-\ \ FOP    ( n -- )
-\ \ Floating-Point-Operation
-\ CODE fop
-\         POP     HL|     
-\         LD      A'|    L|
-\         LD()A   HERE 0 AA,
-\         PUSH    BC|
-\         RST     28|
-\                 HERE SWAP !
-\                 hex 04 C, \ this location is patched each time
-\                 hex 38 C, \ end of calculation
-\         POP     BC|
-\         Next
-\         C;
+\ A floating point number is stored in Spectrum's calculator stack as 5 bytes.
+\ Exponent in A, sign in msb of E, mantissa in the rest of E and DCB.
+\  H   <->  A    # 0   -> a
+\  LDE <->  EDC  # 0DE -> eCD
+\  __  <->  B    # 0
+\ When A is zero, then the float repressent a whole positive number 
+
+\ 6E11h
+\ >W    ( d -- )
+\ takes a double-number from stack and put to floating-pointer stack 
+CODE >w
+        POP     HL|     
+        POP     DE|     
+        PUSH    BC|     
+        RL       L|         \ To keep sign as the msb of H,   
+        RL       H|         \ so you can check for sign in the
+        RR       L|         \ integer-way. Sorry.
+        LDN     B'|    hex FC N,  
+\       LD      B'|    E|    \ maybe a better fit than C0h
+        LD      C'|    E|    
+        LD      E'|    L|    
+        LD      A'|    H|    
+        ANDA     A|
+        JRF    NZ'|   HOLDPLACE
+            LD      H'|    D|  \ swap C and D 
+            LD      D'|    C|
+            LD      C'|    H|
+        HERE DISP, \ THEN,       
+        CALL    hex 2AB6 AA,
+        POP     BC|
+        Next
+        C;
+
+
+\ 6E33h
+\ W>    ( -- d )
+\ takes a double-number from stack and put to floating-pointer stack 
+CODE w>
+        PUSH    BC|     
+        CALL    hex 2BF1 AA,
+        ANDA     A|
+        JRF    NZ'|   HOLDPLACE
+            LD      H'|    D|   \ Swap C and D
+            LD      D'|    C|
+            LD      C'|    H|
+        HERE DISP, \ THEN,       
+        LD      H'|    A|
+        LD      L'|    E|
+        LD      E'|    C|    \ B is lost precision
+        RL       L|         \ To keep sign as the msb of H,
+        RR       H|         \ so you can check for sign in the 
+        RR       L|         \ integer-way. Sorry.
+        POP     BC|
+        PUSH    DE|
+        PUSH    HL|
+        Next
+        C;
+
+
+\ 6E51h
+\ FOP    ( n -- )
+\ Floating-Point-Operation
+CODE fop
+        POP     HL|     
+        LD      A'|    L|
+        LD()A   HERE 0 AA,
+        PUSH    BC|
+        RST     28|
+                HERE SWAP !
+                hex 04 C, \ this location is patched each time
+                hex 38 C, \ end of calculation
+        POP     BC|
+        Next
+        C;
 
 
 \ ______________________________________________________________________
@@ -3281,9 +3588,9 @@ CODE fill ( a n c -- )
         If
             1+
             1 dpl +!
-        Endif
+        Then
         0
-    Endif
+    Then
     ;
 
 
@@ -3315,7 +3622,7 @@ CODE fill ( a n c -- )
         dpl @ 1+    ( d m )
         If
             1 dpl +!
-        Endif
+        Then
         r>          ( d a )
     Repeat
     r>              ( d a )
@@ -3336,18 +3643,18 @@ CODE fill ( a n c -- )
     If
         0 dpl !
         (number)
-    Endif
+    Then
     c@ bl - 0 ?error
     r> If
-        dminus
-    Endif
+        dnegate
+    Then
     ;
 
 
 \ 7178h
 .( -FIND )
-\ used in the form -FIND "ccc"
-\ searches the vocabulary giving CFA and the heading byte 
+\ used in the form -FIND "cccc" 
+\ searches the dictionary giving CFA and the heading byte 
 \ or zero if not found
 : -find ( "ccc" -- cfa b 1 | 0 )
     bl word 
@@ -3361,14 +3668,14 @@ CODE fill ( a n c -- )
         here        \ addr
         latest      \ addr voc
         (find)      \ cfa b 1   |  0 
-    Endif   
+    Then   
     ;
 
 \   dup 0=
 \   If
 \       drop  \ drops 0
 \       here latest (find) \ cfa b f 
-\   Endif
+\   Then
 \   ;
 
 
@@ -3393,16 +3700,16 @@ CODE fill ( a n c -- )
     warning @ 0<
     If
         (abort)
-    Endif
+    Then
 
     here count type 
     .( ? )
     [ HERE TO msg1^ ] MESSAGE  \ ___ forward ___
     s0 @ sp!
-    blk @ -dup
+    blk @ ?dup
     If 
         >in @ swap
-    Endif \ Then
+    Then \ Then
 
     [ HERE TO quit^ ]
 
@@ -3440,39 +3747,46 @@ CODE fill ( a n c -- )
         [ 4 ] Literal 
         [ HERE TO msg2^ ] MESSAGE \ ___ forward ___
         space
-    Endif
+    Then
     
     here 
     dup c@ width @ min 1+ allot
     dup [ decimal 160 ] Literal toggle
-    here 1 - [ decimal 128 ] Literal toggle
+    here 1- [ decimal 128 ] Literal toggle
     latest ,
     current @ !
     here cell+ ,
-    ;
+
+;
 
 
 .( CREATE )
 : create ( -- cccc )
          ( -- n )
     mcod smudge 
+
+
+
+
+
+
     ;code
         INCX    DE|
         PUSH    DE|
         Next
         C;
-    
+
 
 \ Late-Patch for : colon-definition
     ' :  
-        cell+ ' ?exec     over ! 
+        >body ' ?exec     over ! 
         cell+ ' !csp      over !
         cell+ ' current   over !
         cell+ ' @         over !
         cell+ ' context   over !
         cell+ ' !         over !
         cell+ ' create    over !
-        cell+ ' smudge    over ! \ old has no smudge, new has smudge
+        cell+ ' smudge    over !
         cell+ ' ]         over !
         cell+ ' (;code)   over !
     drop
@@ -3480,34 +3794,34 @@ CODE fill ( a n c -- )
 
 \ Late-Patch for ; end-colon-definition
     ' ; 
-        cell+ ' ?csp      over !
+        >body ' ?csp      over !
         cell+ ' compile   over !
-        cell+ ' ;s        over !
+        cell+ ' exit      over !
         cell+ ' smudge    over !
         cell+ ' [         over !
-        cell+ ' ;s        over !
+        cell+ ' exit      over !
     drop
 
 
 \ Late-Patch for CONSTANT
     ' constant  
-        cell+ ' create    over ! 
+        >body ' create    over ! 
         cell+ ' ,         over ! 
-      \ cell+ ' smudge     over ! \ old has smudge, new has no smudge
         cell+ ' (;code)   over !  
     drop
 
 
 \ Late-Patch for VARIABLE
     ' variable  
-        cell+ ' constant  over ! 
+        >body ' 0         over ! 
+        cell+ ' constant  over !
         cell+ ' (;code)   over !  
     drop
 
 
 \ \ Late-Patch for 2CONSTANT
 \     ' variable  
-\         cell+ ' constant  over ! 
+\         >body ' constant  over ! 
 \         cell+ ' ,         over ! 
 \         cell+ ' (;code)   over !  
 \     drop
@@ -3515,9 +3829,8 @@ CODE fill ( a n c -- )
 
 \ Late-Patch for USER
     ' user  
-        cell+ ' create    over ! 
+        >body ' create    over ! 
         cell+ ' c,        over ! 
-      \ cell+ ' smudge    over ! \ old has smudge, new has no smudge
         cell+ ' (;code)   over !  
     drop
 
@@ -3539,7 +3852,7 @@ CODE fill ( a n c -- )
     state @
     If
         compile lit ,
-    Endif
+    Then
     ;
     immediate
 
@@ -3552,7 +3865,7 @@ CODE fill ( a n c -- )
         swap 
         [compile] literal 
         [compile] literal
-    Endif
+    Then
     ;
     immediate
 
@@ -3570,17 +3883,19 @@ CODE fill ( a n c -- )
 \ 7306h    
 .( 0x00 ) \ i.e. nul word
 : ~             \ to be RENAME'd via patch
-    blk @ If 
+    blk @ 
+\   1 >         \ BLOCK #1 is special and exploited by F_GETLINE
+    If 
         1 blk +!  
         0  >in !  
-        blk @ b/scr 1 - and 0= 
+        blk @ b/scr 1- and 0= 
         If 
             ?exec 
             r> drop 
-        Endif
+        Then
     Else
         r> drop
-    Endif \ Then
+    Then \ Then
     ; 
     immediate
     
@@ -3602,7 +3917,7 @@ CODE fill ( a n c -- )
         sp@
         here [ decimal 128 ] Literal + u< 
              [ decimal   7 ] Literal ?error
-    Endif
+    Then
     ;
 
 
@@ -3623,31 +3938,31 @@ CODE fill ( a n c -- )
         If
             state @ <
             If 
-                \ already cfa
-                , 
+                \ already cfa aka xt
+                compile, 
             Else
-                \ already cfa 
+                \ already cfa aka xt 
                 execute 
                 noop            \ need this to avoid LIT to crash the system
-            Endif
+            Then
         Else
             here number 
             dpl @ 1+ 
             If 
-                nmode @ 
-                If 
-                    1 0
-                    2drop       \ Integer option
-                    \ f/        \ Floating point option
-                Endif \ Then 
+\               nmode @ 
+\               If 
+\                   1 0
+\                   2drop       \ Integer option
+\                   \ f/        \ Floating point option
+\               Then \ Then 
                 [compile] dliteral 
             Else
                 drop
                 [compile] literal 
-            Endif 
-        Endif 
+            Then 
+        Then 
         ?stack 
-        ?terminal If (abort) Endif
+        ?terminal If (abort) Then
     Again
     ;
 
@@ -3684,7 +3999,7 @@ immediate
 \ possible patch for first FORTH vocabulary is
     -2 ALLOT 0 ,
 \ this should set to ZERO the voc-link-chain, so this "forth" vocabulary
-\ will be the sole vocabulary available after cut-off.
+\ will be the only vocabulary available after cut-off.
 
 \ Any new vocabulary is structured as follow:
 \ PFA+0 points to DOES> part of VOCABULARY to perform CELL+ CONTEXT !
@@ -3726,6 +4041,7 @@ immediate
 \ Erase the return-stack, stop any compilation and give controlo to 
 \ the console. No message is issued.
 : quit  ( -- )
+\   source-id @ f_close drop  
     0 source-id !
     0 blk !
     [compile] [
@@ -3736,7 +4052,7 @@ immediate
         state @ 0=
         If
             .( ok)
-        Endif
+        Then
     Again
     ;        
     
@@ -3780,7 +4096,7 @@ immediate
     \ XI/O                   \ ___ forward ___
 
     [ here TO splash^ ]
-    SPLASH                   \ ___ forward ___ \
+    SPLASH                   \ ___ forward ___
 
     [ decimal      7 ] Literal emit
 
@@ -3819,6 +4135,8 @@ immediate
     [ decimal      8 ] Literal     \ caps-lock on
     [ hex       5C6A ] Literal c!  \ FLAGS2
     
+
+
     \ [ here TO xi/o^ ]      
     
     \ XI/O                   \ ___ forward ___
@@ -3852,8 +4170,8 @@ here warm^ ! \ patch
         LDN     A'|    1 N,
         LD()A   hex 5C6B AA,   \ DF_SZ system variable
 
-        LDX()   HL|    hex  14 +origin AA, \ forth's RP
-        LD()X   HL|    hex 030 +origin AA,
+        LDHL()  hex  14 +origin AA, \ forth's RP
+        LD()HL  hex 030 +origin AA,
         LDX     BC|    y^              NN, \ ... so BC is WARM, quick'n'dirty
         JRF    CY'|    HOLDPLACE \ IF,
 
@@ -3877,7 +4195,7 @@ CODE basic ( n -- )
         LDX     HL|    0 NN,
         ADDHL   SP|
         LDX()   SP|    hex  08 +origin AA, \ retrieve SP just before...
-        LD()X   HL|    hex  08 +origin AA, \ ...saving Forth SP.
+        LD()HL  hex  08 +origin AA, \ ...saving Forth SP.
 
         EXX
         POP     HL|    \ retrieve Basic HL'
@@ -3897,8 +4215,8 @@ CODE basic ( n -- )
 : +-  ( n1 n2 -- n3 )
     0<
     If
-        minus
-    Endif
+        negate
+    Then
     ;
 
 
@@ -3908,8 +4226,8 @@ CODE basic ( n -- )
 : d+-  ( d1 n -- d2 )
     0<
     If
-        dminus
-    Endif
+        dnegate
+    Then
     ;
 
 
@@ -3943,15 +4261,52 @@ CODE basic ( n -- )
 
 
 \ 75EAh
+\ Symmetric division
 \ divides a double into n giving quotient q and remainder r 
-\ the remainder has the sign of d.
+\ the remainder has the sign of dividend d.
+.( SM/REM )
+: sm/rem  ( d n -- r q ) 
+    over >r >r              \ d     R: h n
+    dabs r@ abs um/mod      \ r q
+    r>                      \ r q n
+    r@ xor +- swap          \ +q r
+    r>     +- swap          \ +r +q
+    ;
+
+
+.( FM/MOD )
+\ Floored division
+\ divides a double into n giving quotient q and remainder r 
+\ the remainder has the sign of the divisor n.
+: fm/mod  ( d n -- r q ) 
+    dup >r                    \ d n      R: n
+    sm/rem                    \ r q
+    over dup                  \ r q r r
+    0= 0= swap 0<             \ r q  r!=0  r<0
+    r@ 0< xor and             \ r q  (r!=0 & r<0^n<0)
+    If 
+        1- swap r> + swap     \ r+n q-1  
+    Else 
+        r> drop               \ r q
+    Then
+    ;
+
+
+.( M/MOD )
+\ Mixed operation. It leaves the remainder n2 and the quotient n3 of the 
+\ integer division of a double integer d by the divisor n1. 
+: m/mod 
+    sm/rem
+    \ if you want floored division use fm/mod instead of sm/rem
+    \ if you want simmetric division use sm/rem instead of fm/mod
+    ;
+
+
 .( M/ )
-: m/  ( d n -- q r ) 
-    over >r >r
-    dabs r abs um/mod
-    r> 
-    r xor +- swap 
-    r>    +- swap
+\ Mixed operation. It leaves the quotient n2 of the integer division 
+\ of a double integer d by the divisor n1.
+: m/ ( d n -- n )
+    m/mod nip 
     ;
 
 
@@ -3968,8 +4323,8 @@ CODE basic ( n -- )
 \ leaves quotient n4 and remainder n3 of the integer division n1 / n2.
 \ the remainder has the sign of n1.
 : /mod  ( n1 n2 -- n3 n4 )
-    >r s->d r>
-    m/
+    >r s>d r>
+    m/mod
     ;
 
 
@@ -3977,7 +4332,7 @@ CODE basic ( n -- )
 .( / )
 \ quotient 
 : /  ( n1 n2 -- n3 )
-    /mod swap drop
+    /mod nip
     ; 
 
 
@@ -3995,7 +4350,7 @@ CODE basic ( n -- )
 \ (n1 * n2) / n3. The intermediate passage through a double number
 \ avoids loss of precision
 : */mod  ( n1 n2 n3 -- n4 n5 )
-    >r  m*  r>  m/
+    >r  m*  r>  m/mod
     ;
     
 
@@ -4004,21 +4359,21 @@ CODE basic ( n -- )
 \ (n1 * n2) / n3. The intermediate passage through a double number
 \ avoids loss of precision
 : */  ( n1 n2 n3 --	n4 )
-    */mod swap drop
+    */mod nip
     ;
 
 
 \ 766Fh
-.( M/MOD )
+\ .( #/MOD )
 \ mixed operation: it leaves the remainder u3 and the quotient ud4 of ud1 / u1.
-\ All terms are unsigned.
-: m/mod  ( ud1 u2 -- u3 ud4 )
-    >r          \ ud1
-    0 r um/mod  \ l rem1 h/r
-    r> swap >r  \ l rem1
-    um/mod      \ rem2 l/r
-    r>          \ rem2 l/r h/r
-    ;
+\ used by # during number representation.
+\ : #/mod  ( ud1 u2 -- u3 ud4 )
+\     >r           \ ud1
+\     0 r@ um/mod  \ l rem1 h/r
+\     r> swap >r   \ l rem1
+\     um/mod       \ rem2 l/r
+\     r>           \ rem2 l/r h/r
+\     ;
     
 
 \ 768Dh
@@ -4061,21 +4416,21 @@ CODE basic ( n -- )
 : message
     warning @
     If
-        \ -dup
+        \ ?dup
         \ If
             [ decimal 4 ] literal
             offset @
             b/scr / -
             .line
             space
-        \ Endif
+        \ Then
     Else
         .( msg#)
         
         [ here TO .^ ]
         
         .             \ ___ forward ___
-    Endif
+    Then
     ;
     
     ' message msg1^  !   \ patch error
@@ -4084,75 +4439,34 @@ CODE basic ( n -- )
     
 \ ______________________________________________________________________ 
 
+
+\ \ 7824h
+.( DEVICE )
+\ used to save current device stream number (video or printer)
+2 variable device        device !
+
+\ 
+\ ______________________________________________________________________ 
+
 \ ZX Microdrive / MGT option
 
 \      NXT @ variable nxt
 
 \ 7727h
 .( STRM )
-       STRM @ variable strm
-
-\ \ 7824h
-.( DEVICE )
-\ used to save current device stream number (video or printer)
-2 variable device
-
-\ 
-\ ______________________________________________________________________ 
-
+       STRM @ variable strm     strm !
 
 \ 7703h
 .( DRV )
-       0 variable drv
+       0 variable drv           drv !
 
 
 \ 770Fh
-.( MAP )
+.( MMAP )
 \ This variable is a pointer to the Microdrive Map, 
 \ i.e. a 32 bytes area = 256 bits each representing one sector
 \ If a bit is set the corrisponding sector is "used". 
-hex 5CF0 variable map
-
-
-\ 7734h >>>
-.( INKEY )
-\ calls ROM inkey$ routine, returns c or "zero".
-CODE inkey ( -- c )
-         
-        PUSH    BC|
-        LD()X   SP|    HEX 02C org^ +  AA, \ saves SP
-        LDX     SP|    HEX  -2 org^ +  NN, \ temp stack just below ORIGIN
-        PUSH    IX|
-        CALL    HEX  15E6  AA,  ( instead of 15E9 )
-        POP     IX|
-        LDX()   SP|    HEX 02C org^ +  AA, \ restore SP
-        LD      L'|    A|
-        LDN     H'|    0 N,
-        POP     BC|
-        Psh1 
-        C;
-
-
-\ 7749h >>>
-.( SELECT )
-\ selects the given channel number
-\ #2 is keyboard or video
-\ #3 is printer or rs-232 i/o port (it depends on OPEN#3 from BASIC)
-\ #4 is depends on OPEN#4 from BASIC
-CODE select ( n -- )
-         
-        POP     HL|
-        PUSH    BC|
-        LD      A'|    L|
-        LD()X   SP|    HEX 02C org^ +  AA, \ saves SP
-        LDX     SP|    HEX  -2 org^ +  NN, \ temp stack just below ORIGIN
-        PUSH    IX|
-        CALL    HEX  1601 AA,
-        POP     IX|
-        LDX()   SP|    HEX 02C org^ +  AA, \ restore SP
-        POP     BC|
-        Next 
-        C;
+hex 5CF0 variable mmap          mmap !
 
 
 \ ______________________________________________________________________ 
@@ -4161,7 +4475,7 @@ CODE select ( n -- )
 
 \ 7719h
 \ CHNL 
-hex 5D2F variable chnl
+hex 5D2F variable chnl          chnl !
 
 
 \ 7734h INKEY  <<<
@@ -4183,11 +4497,11 @@ hex 5D2F variable chnl
         + @  \ offset to stream #n    
         [ hex 5C4F ] Literal  \ CHANS
         @ + \ address of channel #n
-        1 - >r
+        1- >r
             r [ decimal 4 ] Literal + c@ [ hex 4D ] Literal - 
                 [ decimal 25 ] Literal ?error
             r [ decimal 26 ] Literal + @
-            map !
+            mmap !
         r> chnl !   \ normally 5D2F
     r> strm  !   \ normally 4
     ;
@@ -4200,7 +4514,7 @@ hex 5D2F variable chnl
 \ calculates the corrisponding bit (byte and bit)
 \ and fools the microdrive to believe there is only that one sector free.
 : sctr  ( -- )
-    map @ 
+    mmap @ 
     [ decimal 32 ] Literal [ decimal 255 ] Literal fill 
     chnl @ [ decimal 41 ] Literal \ HDNUMB of channel
     + c@                    \ sect
@@ -4212,7 +4526,7 @@ hex 5D2F variable chnl
 \    [ decimal -1 ] Literal
     -1
     xor         \ q negbits
-    map @       \ q negbits 5CF0
+    mmap @       \ q negbits 5CF0
     rot +       \ negbits 5CF0+q
     c!
     ;
@@ -4220,7 +4534,7 @@ hex 5D2F variable chnl
     \ was: 
     \ >r    \ saves the quotient i.e. the offset inside microdrive map
     \ 1 swap -1 Do 2* Loop  2/ 
-    \ [ decimal 255 ] Literal swap - map @ 
+    \ [ decimal 255 ] Literal swap - mmap @ 
     \ r> + c!
 
 
@@ -4300,7 +4614,7 @@ hex 5D2F variable chnl
 
 \ MGT DISCiPLE option
 
-0 variable mgt
+0 variable mgt          mgt !
 
 .( RSAD )
 \ call DISCiPLE 44h hook code (RDAD)
@@ -4342,7 +4656,7 @@ CODE wsad ( a n -- )
     [ decimal 80 ] Literal      < 0= 
     If 
         [ decimal 48 ] Literal  +
-    Endif
+    Then
     [ decimal 256 ] Literal     * + 1+ 
     ;
 
@@ -4373,7 +4687,7 @@ decimal #SEC constant #sec
 : r/w  ( a n f -- )
     >r
     1-  dup 0<           
-        over #sec  1-  > 
+            over #sec  1-  > 
         or [ decimal 6 ] Literal ?error
     r> 
     If
@@ -4382,15 +4696,15 @@ decimal #SEC constant #sec
             mgtrd
         Else
             mdrrd
-        Endif
+        Then
     Else
         mgt @
         If
             mgtwr
         Else
             mdrwr
-        Endif
-    Endif
+        Then
+    Then
     ;
 
 
@@ -4402,7 +4716,7 @@ decimal #SEC constant #sec
     dup limit @ =
     If
         drop first @ 
-    Endif
+    Then
     dup prev @ -
     ;
 
@@ -4436,14 +4750,14 @@ decimal #SEC constant #sec
         +buf 
     Until 
     use !  
-    r @ 0< 
+    r@ @ 0< 
     If  
-        r cell+  
-        r @ [ hex 7FFF ] Literal and  
+        r@ cell+  
+        r@ @ [ hex 7FFF ] Literal and  
         0 r/w  
-    Endif
-    r !  
-    r prev !  
+    Then
+    r@ !  
+    r@ prev !  
     r>  cell+ 
     ;
 
@@ -4458,19 +4772,19 @@ decimal #SEC constant #sec
 : block  ( n -- a )
     offset @ + >r 
     prev @  
-    dup @  r - dup +   \ check equality without most significant bit
+    dup @  r@ - dup +   \ check equality without most significant bit
     If  
         Begin  
             +buf 0=  
             If  
                 drop 
-                r buffer dup 
-                r 1  r/w  2 - 
-            Endif
-            dup @ r - dup +  0= 
+                r@ buffer dup 
+                r@ 1  r/w  2 - 
+            Then
+            dup @ r@ - dup +  0= 
         Until
         dup prev ! 
-    Endif
+    Then
     r> drop cell+
     ;  
     
@@ -4490,11 +4804,12 @@ LIMIT @ FIRST @ - decimal 516 / constant #buff
     Do
         0 buffer drop
     Loop
+
     ;
     
 
 \ 7ac4h    
-.( load+ )
+.( LOAD+ )
 : load+  ( n -- )
     blk @  >r  
     >in  @  >r
@@ -4506,7 +4821,7 @@ LIMIT @ FIRST @ - decimal 516 / constant #buff
     r> >in !
     r> blk !
     ;
-    
+
 
 \ 7af7h    
 .( --> )
@@ -4546,7 +4861,6 @@ LIMIT @ FIRST @ - decimal 516 / constant #buff
     ;
 
 
-
 .( MARKER )
 : marker ( -- ccc )
     <builds
@@ -4581,7 +4895,7 @@ LIMIT @ FIRST @ - decimal 516 / constant #buff
 
 \ 7cbf
 .( #> )
-: #>
+: #>    
     2drop
     hld @ pad over -
     ;
@@ -4589,20 +4903,29 @@ LIMIT @ FIRST @ - decimal 516 / constant #buff
 
 \ 7cd4
 .( SIGN )
-: sign    ( n d -- n )
+: sign    ( n d -- d )
     rot 0<
     If
         [ decimal 45 ] Literal hold
-    Endif
+    Then
     ;
 
 
 \ 7ced
 .( # )
 : #   ( d1 -- d2 )
-    base @ m/mod rot  
+    base @ 
+
+    \ #/mod 
+    >r           \ ud1
+    0 r@ um/mod  \ l rem1 h/r
+    r> swap >r   \ l rem1
+    um/mod       \ rem2 l/r
+    r>           \ rem2 l/r h/r
+
+    rot  
     [ 9 ] Literal over <
-    If [ 7 ] Literal + Endif    
+    If [ 7 ] Literal + Then    
     [ decimal 48 ] Literal 
     + hold
     ;
@@ -4623,7 +4946,7 @@ LIMIT @ FIRST @ - decimal 516 / constant #buff
 .( D.R )
 : d.r    ( d n -- )
     >r
-    swap over dabs 
+    tuck dabs 
     <# #s sign #> 
     r>
     over - spaces
@@ -4634,7 +4957,7 @@ LIMIT @ FIRST @ - decimal 516 / constant #buff
 \ 7d50
 .( .R )
 : .r
-    >r  s->d  r>
+    >r  s>d  r>
     d.r
     ;
 
@@ -4649,7 +4972,7 @@ LIMIT @ FIRST @ - decimal 516 / constant #buff
 \ 7d70
 .( . )
 : .    
-    s->d  d.
+    s>d  d.
     ;
     
     ' . .^ ! \ patch
@@ -4683,7 +5006,7 @@ LIMIT @ FIRST @ - decimal 516 / constant #buff
         If 
             cr 
             0 out ! 
-        Endif
+        Then
         dup id.
         pfa lfa @ 
         dup 0= 
@@ -4708,7 +5031,7 @@ LIMIT @ FIRST @ - decimal 516 / constant #buff
         i scr @ .line
         ?terminal If 
             leave 
-        Endif
+        Then
     Loop
     cr
     ;
@@ -4724,9 +5047,10 @@ LIMIT @ FIRST @ - decimal 516 / constant #buff
         .r space
         0 i .line 
         ?terminal If
-            leave
-        Endif
+            leave 
+        Then
     Loop
+    cr
     ;
 
 
@@ -4741,7 +5065,7 @@ LIMIT @ FIRST @ - decimal 516 / constant #buff
 
 
 \ 7e86
-.( CLS )
+.( CLS or PAGE )
 CODE cls
         PUSH    BC| 
         PUSH    IX|
@@ -4755,10 +5079,12 @@ CODE cls
 \ 7e96
 .( SPLASH )
 : splash
-    cls cr
-    .( v-Forth 1.5m MDR/MGT version)  cr
-    .( build 20210131)  cr
-    .( 1990-2021 Matteo Vitturi)  cr
+    cls
+    [compile] (.")
+    [ decimal 69 here ," v-Forth 1.52 MDR/MGT version" -1 allot ]
+    [ decimal 13 here ," build 20220730" -1 allot ]
+    [ decimal 13 here ," 1990-2022 Matteo Vitturi" -1 allot ]
+    [ decimal 13 c, c! c! c! ] 
     ;
 
     ' splash splash^ ! \ patch 
@@ -4768,7 +5094,7 @@ CODE cls
 \ XI/O
 \ : xi/o
 \     0 channel !
-\     0 map !
+\     0 mmap !
 \     [ decimal 4 ] Literal mdr
 \     ;
 \ 
@@ -4798,23 +5124,27 @@ CODE cls
 \ returns n2 as the number of read characters.
 : accept- ( a n1 -- n2 )
     >r    ( a )
-    0     ( a 0 )
-    swap  ( 0 a )
-    dup   ( 0 a a )
-    r>    ( 0 a a n )
-    +     ( 0 a n+a )
-    swap  ( 0 n+a a )
-    Do    ( 0 )
+    0     ( a n2 as the final counter )
+    swap  ( n2 a )
+    dup   ( n2 a a )
+    r>    ( n2 a a n1 )
+    +     ( n2 a n1+a )
+    swap  ( n2 n1+a a )
+    Do    ( n2 )
+
         inkey 
-        dup 0= If video quit Endif
-        dup [ decimal 13 ] literal = If drop 0 Endif \ Then
-        dup [ decimal 10 ] literal = If drop 0 Endif \ Then
-        dup  0=  If leave Endif \ Then
-        i c!
-        1+
+
+        dup 0= If video quit Then
+        dup [ decimal 13 ] literal = If drop 0 Then \ Then
+        dup [ decimal 10 ] literal = If drop 0 Then \ Then
+        \ dup  0=  If 
+        \     lastl
+        \ Then \ Then
+        i c! ( n2 )
+        1+ ( increment n2 )
+        i c@ 0= If leave Then
     Loop  ( n2 )
     ;
-
 
 
 .( LOAD- )
@@ -4851,7 +5181,7 @@ CODE cls
         load-
     Else
         load+
-    Endif
+    Then
     ;
 
 
@@ -4859,10 +5189,10 @@ CODE cls
 \ this word is called the first time the Forth system boot to
 \ load Screen# 1. Once called it patches itself to prevent furhter runs.
 : autoexec
-    [ decimal 11     ] Literal  
+    [ decimal 10 0 +origin 32768 u< 1 and + ] Literal  \ this give 10 or 11 
     [ ' noop         ] Literal  
     [ autoexec^      ] Literal  !  \ patch autoexec-off
-    load
+    load 
     quit
     ;
     ' autoexec autoexec^ ! \ patch autoexec-on in ABORT
@@ -4872,6 +5202,7 @@ CODE cls
 : bye ( -- )
     flush
     empty-buffers
+
     0 +origin 
     basic
     ;
@@ -4892,10 +5223,10 @@ CODE cls
     ;
     
 
-\ MARK
-: mark ( a n -- )
-    invv type truv
-    ;
+\ \ MARK
+\ : mark ( a n -- )
+\     invv type truv
+\     ;
 
 
 .( BACK )
@@ -4905,7 +5236,7 @@ CODE cls
 
 
 .( IF ... THEN )
-.( IF ... ELSE ... ENDIF )
+.( IF ... ELSE ... THEN )
 : if    ( -- a 2 ) \ compile-time 
     compile 0branch
     here 0 , 
@@ -4914,8 +5245,8 @@ CODE cls
     immediate
 
 
-.( ENDIF )
-: endif ( a 2 -- ) \ compile-time 
+.( THEN )
+: then ( a 2 -- ) \ compile-time 
     ?comp
     2 ?pairs  
     here over - swap ! 
@@ -4923,9 +5254,9 @@ CODE cls
     immediate
     
 
-.( THEN )
-: then ( a 2 -- ) \ compile-time 
-    [compile] endif 
+.( ENDIF )
+: endif ( a 2 -- ) \ compile-time 
+    [compile] then 
     ; 
     immediate
 
@@ -4936,7 +5267,7 @@ CODE cls
     2 ?pairs  
     compile branch
     here 0 , 
-    swap 2 [compile] endif
+    swap 2 [compile] then
     2 
     ; 
     immediate
@@ -4948,7 +5279,7 @@ CODE cls
 : begin     ( -- a 1 ) \ compile-time  
     ?comp 
     here 
-    1 
+    2 
     ; 
     immediate
 
@@ -4956,7 +5287,7 @@ CODE cls
 .( AGAIN )
 : again     ( a 1 -- ) \ compile-time 
     ?comp
-    1 ?pairs 
+    2 ?pairs 
     compile branch
     back 
     ; 
@@ -4966,7 +5297,7 @@ CODE cls
 .( UNTIL )
 : until     ( a 1 -- ) \ compile-time 
     ?comp
-    1 ?pairs
+    2 ?pairs
     compile 0branch
     back 
     ; 
@@ -4974,22 +5305,23 @@ CODE cls
 
 
 .( END )
-: end [compile] until ; immediate
+: end       ( a 1 -- ) \ compile-time 
+    [compile] until ; immediate
 
 
 .( WHILE )
-: while     ( a1 1 -- a1 1 a2 4 ) \ compile-time 
-    [compile] if 2+
+: while     ( a1 1 -- a2 4 a1 1 ) \ compile-time
+    [compile] if \ 2+
+    2swap
     ; 
     immediate
 
 
 .( REPEAT )
-: repeat    ( a1 1 a2 4 -- ) \ compile-time
-    2swap
+: repeat    ( a2 4 a 2 -- ) \ compile-time
     [compile] again
-    2 - 
-    [compile] endif
+    \ 2 - 
+    [compile] then
     ; 
     immediate
 
@@ -4998,11 +5330,12 @@ CODE cls
 \ peculiar version of BACK fitted for ?DO and LOOP
 : ?do-
     back
-    sp@ csp @ -
-    \ dup 0= 
-    If 
-        2+ [compile] endif 
-    Endif       
+    Begin
+        sp@ csp @ -
+        \ dup 0= 
+    While
+        2+ [compile] then 
+    Repeat 
     ?csp csp !      
     ;
 
@@ -5056,7 +5389,7 @@ CODE cls
         >in @ c/l mod c/l swap - >in +!
     Else
         [ decimal 80 ] Literal  >in !
-    Endif
+    Then
     ;
     immediate
 
@@ -5100,7 +5433,7 @@ CODE cls
         compile !
     Else
         ! 
-    Endif
+    Then
     ;
     immediate
 
@@ -5118,7 +5451,6 @@ voc-link @ hex 020 +origin !  \ set cold-VOC-LINK
 ' noop asm^ !
 
 forth definitions
-
 
 \ ______________________________________________________________________ 
 
@@ -5157,7 +5489,6 @@ CODE final_rp_patch
 \ ______________________________________________________________________ 
 
 
-
 RENAME   to             TO
 RENAME   value          VALUE
 RENAME   rename         RENAME 
@@ -5179,7 +5510,7 @@ RENAME   then           THEN
 RENAME   endif          ENDIF
 RENAME   if             IF
 RENAME   back           BACK
-RENAME   mark           MARK
+\ RENAME   mark           MARK
 RENAME   truv           TRUV
 RENAME   invv           INVV
 RENAME   bye            BYE
@@ -5232,8 +5563,8 @@ RENAME   mgtsts         MGTSTS
 RENAME   wsad           WSAD
 RENAME   rsad           RSAD
 RENAME   mgt            MGT
-RENAME   select         SELECT
-RENAME   inkey          INKEY 
+\ RENAME   select         SELECT
+\ RENAME   inkey          INKEY 
 \
 RENAME   mdrwr          MDRWR
 RENAME   mdrrd          MDRRD
@@ -5242,27 +5573,30 @@ RENAME   mdrget         MDRGET
 RENAME   sctr           SCTR
 RENAME   mdr            MDR
 RENAME   chnl           CHNL
-RENAME   map            MAP
+RENAME   mmap           MMAP
 RENAME   drv            DRV
-RENAME   device         DEVICE
 RENAME   strm           STRM
+RENAME   device         DEVICE
 RENAME   message        MESSAGE
 RENAME   .line          .LINE
 RENAME   (line)         (LINE)
-RENAME   m/mod          M/MOD
+\ RENAME   #/mod          #/MOD
 RENAME   */             */
 RENAME   */mod          */MOD
 RENAME   mod            MOD
 RENAME   /              /
 RENAME   /mod           /MOD
 RENAME   *              *
-RENAME   m/             M/
+RENAME   m/             M/ 
+RENAME   m/mod          M/MOD 
+RENAME   fm/mod         FM/MOD
+RENAME   sm/rem         SM/REM 
 RENAME   m*             M*
 RENAME   dabs           DABS
 RENAME   abs            ABS
 RENAME   d+-            D+-
 RENAME   +-             +-
-RENAME   s->d           S->D
+RENAME   s>d            S>D
 RENAME   basic          BASIC
 RENAME   cold           COLD
 RENAME   warm           WARM
@@ -5297,9 +5631,9 @@ RENAME   number         NUMBER
 \ RENAME   f+             F+    
 \ RENAME   f/             F/    
 \ RENAME   f*             F*    
-\ RENAME   fop            FOP   
-\ RENAME   w>             W>    
-\ RENAME   >w             >W    
+RENAME   fop            FOP   
+RENAME   w>             W>    
+RENAME   >w             >W    
 
 RENAME   (number)       (NUMBER)
 RENAME   (sgn)          (SGN) 
@@ -5315,15 +5649,17 @@ RENAME   pad            PAD
 RENAME   hold           HOLD
 RENAME   blanks         BLANKS
 RENAME   erase          ERASE 
-RENAME   fill           FILL 
+RENAME   fill           FILL  
 RENAME   query          QUERY 
-RENAME   expect         EXPECT
-RENAME   accept         ACCEPT
+\ RENAME   expect         EXPECT
+RENAME   accept         ACCEPT 
 RENAME   -trailing      -TRAILING
+RENAME   leave          LEAVE
 RENAME   type           TYPE  
+RENAME   bounds         BOUNDS  
 RENAME   count          COUNT 
 RENAME   does>          DOES> 
-RENAME   recurse        RECURSE
+\ RENAME   recurse        RECURSE
 RENAME   <builds        <BUILDS
 RENAME   ;code          ;CODE  
 RENAME   (;code)        (;CODE)
@@ -5333,6 +5669,7 @@ RENAME   immediate      IMMEDIATE
 RENAME   smudge         SMUDGE
 RENAME   ]              ]
 RENAME   [              [
+RENAME   compile,       COMPILE,   
 RENAME   compile        COMPILE 
 RENAME   ?loading       ?LOADING
 RENAME   ?csp           ?CSP  
@@ -5364,6 +5701,8 @@ RENAME   c,             C,
 RENAME   ,              ,    
 RENAME   allot          ALLOT
 RENAME   here           HERE 
+
+RENAME   handler        HANDLER
 RENAME   span           SPAN 
 RENAME   source-id      SOURCE-ID
 RENAME   place          PLACE
@@ -5443,7 +5782,9 @@ RENAME   2dup           2DUP
 RENAME   2swap          2SWAP 
 RENAME   2drop          2DROP 
 RENAME   2over          2OVER 
+RENAME   roll           ROLL  
 RENAME   pick           PICK  
+RENAME   -rot           -ROT   
 RENAME   rot            ROT   
 RENAME   dup            DUP   
 RENAME   swap           SWAP  
@@ -5451,10 +5792,11 @@ RENAME   tuck           TUCK
 RENAME   nip            NIP  
 RENAME   drop           DROP  
 RENAME   over           OVER  
-RENAME   dminus         DMINUS
-RENAME   minus          MINUS 
+RENAME   dnegate        DNEGATE
+RENAME   negate         NEGATE 
 RENAME   cell-          CELL-  
-RENAME   align          ALIGN
+RENAME   2-             2- 
+\ RENAME   align          ALIGN 
 RENAME   cell+          CELL+  
 RENAME   2+             2+ 
 RENAME   1-             1- 
@@ -5463,12 +5805,14 @@ RENAME   d+             D+
 RENAME   +              +  
 RENAME   0>             0> 
 RENAME   0<             0< 
+RENAME   not            NOT
 RENAME   0=             0= 
-RENAME   r              R  
+RENAME   r              R 
+RENAME   r@             R@
 RENAME   r>             R> 
 RENAME   >r             >R 
-RENAME   leave          LEAVE
-RENAME   ;s             ;S  
+\ RENAME   lastl          LASTL
+RENAME   exit           EXIT  
 RENAME   rp!            RP! 
 RENAME   rp@            RP@ 
 RENAME   sp!            SP! 
@@ -5481,25 +5825,31 @@ RENAME   um*            UM*
 RENAME   cmove>         CMOVE>
 RENAME   cmove          CMOVE 
 RENAME   cr             CR    
+RENAME   select         SELECT
+RENAME   inkey          INKEY 
 RENAME   ?terminal      ?TERMINAL
 RENAME   key            KEY    
+RENAME   curs           CURS 
 \ RENAME   bleep          BLEEP  
 RENAME   (?emit)        (?EMIT)
 RENAME   emitc          EMITC  
 RENAME   (compare)      (COMPARE)
+RENAME   (map)          (MAP)
 RENAME   enclose        ENCLOSE
 RENAME   (find)         (FIND) 
 RENAME   upper          UPPER 
 RENAME   caseoff        CASEOFF
 RENAME   caseon         CASEON
 RENAME   digit          DIGIT  
+RENAME   i'             I'     
 RENAME   i              I      
 RENAME   (do)           (DO)   
 RENAME   (?do)          (?DO)  
-RENAME   (+loop)        (+LOOP)
-RENAME   (loop)         (LOOP) 
+RENAME   (leave)        (LEAVE)
 RENAME   0branch        0BRANCH
 RENAME   branch         BRANCH 
+RENAME   (+loop)        (+LOOP)
+RENAME   (loop)         (LOOP) 
 RENAME   execute        EXECUTE
 RENAME   lit            LIT
 
@@ -5508,17 +5858,19 @@ RENAME   lit            LIT
 
 SPLASH \ Return to Splash screen
 
+
 \ display address and length
 DECIMAL  
 1 WARNING !
 CR CR ." give LET A="    0 +ORIGIN DUP U. ." : GO TO 80" CR CR
-CR CR ." give SAVE f$ CODE A," FENCE @ SWAP - U. CR CR
+CR CR ." give SAVE f$ CODE A, " FENCE @ SWAP - U. CR CR
+
+CASEOFF
 
 \ ______________________________________________________________________ 
 
 \ this cuts LFA so dictionary starts with "lit"
-0 ' LIT 2 - ! final_rp_patch 0 +ORIGIN BASIC
-
+0 ' LIT 2 - ! final_rp_patch 0 +ORIGIN ( SOURCE-ID @ F_CLOSE DROP ) BASIC
 \
 \ Origin area.
 \
@@ -5542,6 +5894,7 @@ CR CR ." give SAVE f$ CODE A," FENCE @ SWAP - U. CR CR
 \          *SP      Z80 Stack Pointer register in Basic
 \ 62FF     *RAMTOP  Logical RAM top (RAMTOP var is 23730)
 \ 6400      ORIGIN  Forth Origin
+\ 64..     *IX      Inner Interpreter pointed by IX.
 \                   FENCE @
 \                   LATEST @
 \           HERE    DP @
@@ -5551,7 +5904,7 @@ CR CR ." give SAVE f$ CODE A," FENCE @ SWAP - U. CR CR
 \           ...     Stack grows downward
 \ SP                SP@
 \ F840              S0 @
-\ F840              TIB     TIB @
+\ F840              #TIB     TIB @
 \                   #...     Return stack grows downward: it can hold 80 entries
 \                   #RP@
 \ F8E0              #R0 @
