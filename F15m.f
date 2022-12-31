@@ -1,17 +1,17 @@
 \ ______________________________________________________________________ 
 \
 .( v-Forth 1.52 MDR/MGT version ) CR
-.( build 20220730 ) CR 
+.( build 20230101 ) CR 
 \
 \ ZX Microdrive version + MGT DISCiPLE version
 \ ______________________________________________________________________
 \
 \ This work is available as-is with no whatsoever warranty.
 \ Copying, modifying and distributing this software is allowed 
-\ provided that the copyright notice is kept.  
+\ provided that this copyright notice is kept.  
 \ ______________________________________________________________________
 \
-\ by Matteo Vitturi, 1990-2022
+\ by Matteo Vitturi, 1990-2023
 \
 \ https://sites.google.com/view/vforth/vforth1413
 \ https://www.oocities.org/matteo_vitturi/english/index.htm
@@ -818,7 +818,7 @@ CODE upper ( c1 -- c2 )
 \ On success, it returns the CFA of found word, the first NFA byte
 \ (which contains length and some flags) and a true flag.
 \ On fail, a false flag  (no more: leaves addr unchanged)
-CODE (find) ( addr voc -- addr 0 | cfa b 1  )
+CODE (find) ( addr voc -- ff | cfa b tf  )
          
         POP     DE|        \ dictionary
         HERE
@@ -869,7 +869,7 @@ CODE (find) ( addr voc -- addr 0 | cfa b 1  )
                     EXAFAF                \ retrieve NFA byte (!)
                     LD      E'|    A|
                     LDN     D'|    0 N,
-                    LDX     HL|    1 NN,
+                    LDX     HL|   -1 NN,
                     PUSH    DE|
                     PUSH    HL|
                     Next
@@ -1061,6 +1061,10 @@ CODE emitc     ( c -- )
     HERE TO emitc^    
         PUSH    BC|
         PUSH    IX|
+\       PUSH    IX|
+\       EXX
+\       POP     HL|
+\       EXX
         RST     10|             \ standard ROM current-channel print routine
         POP     IX|
         POP     BC|
@@ -1200,31 +1204,31 @@ EMIT-2^ EMIT-A^ 0E +  !
 \ KEY decode table
 HEX 
 HERE TO KEY-1^
-    E2   C,   \  0: STOP  --> SYMBOL+A : ~
-    C3   C,   \  1: NOT   --> SYMBOL+S : |
-    CD   C,   \  2: STEP  --> SYMBOl+D : \
-    CC   C,   \  3: TO    --> SYMBOL+F : {
-    CB   C,   \  4: THEN  --> SYMBOL+G : }
-    C6   C,   \  5: AND   --> SYMBOL+Y : [
-    C5   C,   \  6: OR    --> SYMBOL+U : ]
-    AC   C,   \  7: AT    --> SYMBOL+I : (C) copyright symbol
-    C7   C,   \  8: <=    --> SYMBOL+Q : same as SHIFT-1 [EDIT]
-    C8   C,   \  9: >=    --> SYMBOL+E : same as SHIFT-0 [BACKSPACE]
+    E2   C,   \  0: STOP  --> SYMBOL+A   ~
+    C3   C,   \  1: NOT   --> SYMBOL+S   |
+    CD   C,   \  2: STEP  --> SYMBOl+D   \
+    CC   C,   \  3: TO    --> SYMBOL+F   {
+    CB   C,   \  4: THEN  --> SYMBOL+G   }
+    C6   C,   \  5: AND   --> SYMBOL+Y   [
+    C5   C,   \  6: OR    --> SYMBOL+U   ]
+    AC   C,   \  7: AT    --> SYMBOL+I   (C) copyright symbol
+    C7   C,   \  8: <=    --> SYMBOL+Q   same as SHIFT-1 [EDIT]
+    C8   C,   \  9: >=    --> SYMBOL+E   same as SHIFT-0 [BACKSPACE]
     C9   C,   \ 10: <>    --> SYMBOL+W is the same as CAPS (toggle) SHIFT+2 
 \ _________________
 
 HERE TO KEY-2^  \ same table in reverse order, sorry, I am lazy
     06   C,   \ 10: SYMBOL+W is the same as CAPS (toggle) SHIFT+2 
-    0C   C,   \  9: SYMBOL+E : same as SHIFT-0 [BACKSPACE]
-    07   C,   \  8: SYMBOL+Q : same as SHIFT-1 [EDIT]
-    7F   C,   \  7: SYMBOL+I : (C) copyright symbol
-    5D   C,   \  6: SYMBOL+U : ]
-    5B   C,   \  5: SYMBOL+Y : [
-    7D   C,   \  4: SYMBOL+G : }
-    7B   C,   \  3: SYMBOL+F : {
-    5C   C,   \  2: SYMBOl+D : \
-    7C   C,   \  1: SYMBOL+S : |
-    7E   C,   \  0: SYMBOL+A : ~
+    0C   C,   \  9: SYMBOL+E   same as SHIFT-0 [BACKSPACE]
+    07   C,   \  8: SYMBOL+Q   same as SHIFT-1 [EDIT]
+    7F   C,   \  7: SYMBOL+I   (C) copyright symbol
+    5D   C,   \  6: SYMBOL+U   ]
+    5B   C,   \  5: SYMBOL+Y   [
+    7D   C,   \  4: SYMBOL+G   }
+    7B   C,   \  3: SYMBOL+F   {
+    5C   C,   \  2: SYMBOl+D   \
+    7C   C,   \  1: SYMBOL+S   |
+    7E   C,   \  0: SYMBOL+A   ~
 
 
 \ new
@@ -1385,6 +1389,10 @@ CODE inkey ( -- c )
         LD()X   SP|    HEX 02C org^ +  AA, \ saves SP
         LDX     SP|    HEX  -5 org^ +  NN, \ temp stack just below ORIGIN
         PUSH    IX|
+\       PUSH    IX|
+\       EXX
+\       POP     HL|
+\       EXX
         CALL    HEX  15E6  AA,  ( instead of 15E9 )
         POP     IX|
         LDX()   SP|    HEX 02C org^ +  AA, \ restore SP
@@ -2506,7 +2514,7 @@ CODE cells ( n2 -- n2 )
         LD      B'|    D|
         Next
         C;
-    IMMEDIATE
+    \ not IMMEDIATE
     
     \ we defined this peculiar word using "old" colon definition 
     \ behaviour. Now we want to use the ;CODE just coded.
@@ -3350,9 +3358,9 @@ CODE fill ( a n c -- )
 
 
 \ 6D88h
-.( BLANKS )
+.( BLANK )
 \ If n > 0, fills n locations starting from address a with SPACE characters.
-: blanks ( a n -- )
+: blank ( a n -- )
     bl fill
     ;
 
@@ -3402,7 +3410,7 @@ CODE fill ( a n c -- )
     Then \ Then
     >in @ + 
     swap enclose
-    here [ decimal 34 ] Literal blanks
+    here [ decimal 34 ] Literal blank 
     >in +!
     over - >r
     r@ here c!
@@ -3962,7 +3970,7 @@ CODE fop
             Then 
         Then 
         ?stack 
-        ?terminal If (abort) Then
+\       ?terminal If (abort) Then
     Again
     ;
 
@@ -4603,7 +4611,7 @@ hex 5D2F variable chnl          chnl !
     [ decimal  11 ] Literal + !     \ CHBYTE of channel
     strm @ select
     r [ decimal 593 ] Literal + c@  \ latest byte of channel's data-area
-    emitc
+    emitc 
     device @ select
     \ it puts 255 to CHREC to clear everything.
     [ decimal 255 ] Literal r>  
@@ -4904,7 +4912,7 @@ LIMIT @ FIRST @ - decimal 516 / constant #buff
 \ 7cd4
 .( SIGN )
 : sign    ( n d -- d )
-    rot 0<
+    0<
     If
         [ decimal 45 ] Literal hold
     Then
@@ -4913,21 +4921,21 @@ LIMIT @ FIRST @ - decimal 516 / constant #buff
 
 \ 7ced
 .( # )
-: #   ( d1 -- d2 )
-    base @ 
+: #   ( ud1 -- ud2 )
+    base @       \ ud  b
 
     \ #/mod 
-    >r           \ ud1
-    0 r@ um/mod  \ l rem1 h/r
-    r> swap >r   \ l rem1
-    um/mod       \ rem2 l/r
-    r>           \ rem2 l/r h/r
-
-    rot  
+    >r           \ ud               R: b
+    0 r@ um/mod  \ l  rh    h/b   
+    r> swap >r   \ l  rh    b       R: h/b
+    um/mod       \ r  l/b
+    r>           \ r  l/b   h/b
+                 \ r  ud/b
+    rot          \ ud  r 
     [ 9 ] Literal over <
     If [ 7 ] Literal + Then    
     [ decimal 48 ] Literal 
-    + hold
+    + hold       \ n  ud
     ;
 
 
@@ -4947,7 +4955,7 @@ LIMIT @ FIRST @ - decimal 516 / constant #buff
 : d.r    ( d n -- )
     >r
     tuck dabs 
-    <# #s sign #> 
+    <# #s rot sign #> 
     r>
     over - spaces
     type
@@ -5082,8 +5090,8 @@ CODE cls
     cls
     [compile] (.")
     [ decimal 69 here ," v-Forth 1.52 MDR/MGT version" -1 allot ]
-    [ decimal 13 here ," build 20220730" -1 allot ]
-    [ decimal 13 here ," 1990-2022 Matteo Vitturi" -1 allot ]
+    [ decimal 13 here ," build 20230101" -1 allot ]
+    [ decimal 13 here ," 1990-2023 Matteo Vitturi" -1 allot ]
     [ decimal 13 c, c! c! c! ] 
     ;
 
@@ -5156,7 +5164,7 @@ CODE cls
     Begin
         tib @                        ( a )
         dup [ decimal 80 ] literal   ( a a n )
-        2dup blanks                  ( a a n )
+        2dup blank                   ( a a n )
         source-id @ abs dup device ! select  \ was printer
         accept-                      ( a n2 )
         video 
@@ -5647,7 +5655,7 @@ RENAME   (.")           (.")
 RENAME   word           WORD  
 RENAME   pad            PAD   
 RENAME   hold           HOLD
-RENAME   blanks         BLANKS
+RENAME   blank          BLANK 
 RENAME   erase          ERASE 
 RENAME   fill           FILL  
 RENAME   query          QUERY 
