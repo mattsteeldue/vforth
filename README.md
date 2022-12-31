@@ -15,10 +15,11 @@ think nobody on Earth ever owned 8 Microdrive-units at the same time, so the onl
 
 To run under Windows you should use  fuse.exe  
 To spare some timeat start-up, you can specify the switches to enable ZX Interface I and eight Microdrive units.
+
     --interface1   
     --microdrive-file   M1.MDR  
     --microdrive-2-file M2.MDR
-    ...
+    -- etc.
     --microdrive-8-file M8.MDR
 
 
