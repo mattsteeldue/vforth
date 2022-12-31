@@ -36,8 +36,10 @@ DISCiPLE version
 It uses both disks: unit #1 for MGT system and Forth itself and unit #2 for data storage to offer 1560 Blocks / Screens (780 KBytes). 
 Again, better use an emulator.
 To spare some time you can specify the suitable switches
+
     --disciple 
     --discipledisk Forth1.IMG 
+
 I'm not aware of a switch to insert the second floppy disk image at start-up, and you have to select Forth2.IMG via usual menu bar.
 
 
