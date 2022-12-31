@@ -11,7 +11,7 @@ ZX Microdrive version
 ---------------------
 It uses all the 8 Microdrive units, somehow chained together, to offer 1778 blocks half-KB each (889 KBytes). I
 think nobody on Earth ever owned 8 Microdrive-units at the same time, so the only way to use this much storage is using an emulator.
-Nevertheless, this Forth system was born and run on my real 48K hardware for years.
+
 
 To run under Windows you should use  fuse.exe  
 To spare some timeat start-up, you can specify the switches to enable ZX Interface I and eight Microdrive units.
@@ -20,6 +20,15 @@ To spare some timeat start-up, you can specify the switches to enable ZX Interfa
     --microdrive-2-file M2.MDR
     ...
     --microdrive-8-file M8.MDR
+
+
+Once the Spectrum is shows the copyright message, you should give the classic  RUN  to load the "run" loader.
+
+Running on real hardware
+------------------------
+This Forth system was born and run on my  48K  for years, but to effectively run under real hardware you need to use "run_HW" Basic loader instead of the usual "run" loader. That loader prompts you to switch cartridges, removing the "Programs" cartridge and inserting the "Blocks" one, and awaits a keypress.
+Conversely, the "Blocks" cartridge must be prepared beforehand using the Basic program "Tap2Mdr.bas" that reads from tape four string-array to be transferred to a single text file to fill all the cartridge. Usually such a transfer program breaks with "Microdrive full" message after 160/170 blocks, depending on the real capacity of a cartridge. At this point the real-hardware single-unit system is ready to run.
+
 
 
 DISCiPLE version 
