@@ -1,12 +1,47 @@
 # vforth
 
+This is a back-porting to ZX Microdrive and DISCiPLE MGT from v.Forth NEXTZXOS version ( https://github.com/mattsteeldue/vforth-next ).
+
+Apart from some obvious hardware limitations, the NEXTZXOS documentation is valid for this backporting.
+
+To run this Forth system within an emulator, you have to pick one that supports Microdrive and/or DISCiPLE disk drive, such as Fuse (https://fuse-emulator.sourceforge.net) that works well under Windows and Linux.
 
 
-__v.Forth 1.52m__ 
+ZX Microdrive version  
+---------------------
+It uses all the 8 Microdrive units, somehow chained together, to offer 1778 blocks half-KB each (889 KBytes). I
+think nobody on Earth ever owned 8 Microdrive-units at the same time, so the only way to use this much storage is using an emulator.
+Nevertheless, this Forth system was born and run on my real 48K hardware for years.
+
+To run under Windows you should use  fuse.exe  
+To spare some timeat start-up, you can specify the switches to enable ZX Interface I and eight Microdrive units.
+    --interface1   
+    --microdrive-file   M1.MDR  
+    --microdrive-2-file M2.MDR
+    ...
+    --microdrive-8-file M8.MDR
+
+
+DISCiPLE version 
+----------------
+It uses both disks: unit #1 for MGT system and Forth itself and unit #2 for data storage to offer 1560 Blocks / Screens (780 KBytes). 
+Again, better use an emulator.
+To spare some time you can specify the suitable switches
+    --disciple 
+    --discipledisk Forth1.IMG 
+I'm not aware of a switch to insert the second floppy disk image at start-up, and you have to select Forth2.IMG via usual menu bar.
+
+
+
+History
+-------
+
+
+__v-Forth 1.52m__ 
 
 __build 20220730 - Matteo Vitturi, 1990-2022__
 
-Back-porting from v.Forth 1.52 - Sinclair ZX Spectrum Next Version.
+Back-porting to 48/128 KB from v-Forth 1.52 - Sinclair ZX Spectrum Next Version.
 
 
 
