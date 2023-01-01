@@ -45,6 +45,7 @@ To spare some time you can specify the suitable switches
 
 I'm not aware of a switch Fuse provides to insert the second floppy disk image at start-up, and you have to select Forth2.IMG via usual menu bar.
 
+To start v-Forth system, you have to load the "run" Basic loader, usually  LOAD P6  would suffice.
 
 
 History
