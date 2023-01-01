@@ -9,12 +9,12 @@ To run this Forth system within an emulator, you have to pick one that supports 
 
 ZX Microdrive version  
 ---------------------
-It uses all the 8 Microdrive units, somehow chained together, to offer 1778 blocks half-KB each (889 KBytes). I
-think nobody on Earth ever owned 8 Microdrive-units at the same time, so the only way to use this much storage is using an emulator.
+It uses all the 8 Microdrive units, somehow chained together, to offer 1778 blocks half-KB each (889 KBytes). 
+Emulators provide such 8 Microdrive units: the first unit is used to keep the system loader while the other 7 units are used to store blocks.
+This Forth system uses a low-level direct acces to sectors, so that the "!Blocks" text-file appears as a single file spread across 7 cartridges.
+I think nobody on Earth ever owned 8 Microdrive-units at the same time, so the only way to use this much storage is using an emulator.
 
-
-To run under Windows you can use  fuse.exe  
-To spare some time at start-up, you can specify the switches to enable ZX Interface 1 and insert eight Microdrive cartridges.
+To run under Windows you can use  Fuse  and to spare some time at start-up, you can specify the switches to enable ZX Interface 1 and insert eight Microdrive cartridges.
 
     --interface1   
     --microdrive-file   M1.MDR  
@@ -24,6 +24,7 @@ To spare some time at start-up, you can specify the switches to enable ZX Interf
 
 
 Once the Spectrum is shows the copyright message, you should give the classic  RUN  to load the "run" loader.
+
 
 Running on real hardware
 ------------------------
