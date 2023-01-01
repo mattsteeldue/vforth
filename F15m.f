@@ -4484,13 +4484,12 @@ hex 5CF0 variable mmap          mmap !
 \ 7719h
 \ CHNL 
 hex 5D2F variable chnl          chnl !
-
+       4 variable mgt           mgt  !
 
 \ 7734h INKEY  <<<
 \
 \ 7749h SELECT <<<
 \ 
-
 
 \ 775Eh
 \ OPEN - MDR
@@ -4578,7 +4577,7 @@ hex 5D2F variable chnl          chnl !
            [ decimal 254 ] Literal /mod   \ find drive# and sector#
     dup    [ decimal  48 ] Literal +
         r  [ decimal  53 ] Literal + c!   \ Last byte of HDNAME
-    2+                                    \ DR0 is drive #2
+    mgt @ 2/ +                            \ DR0 is drive #2
         r  [ decimal  25 ] Literal + c!   \ CHDRIV
     1-  r> [ decimal  13 ] Literal + c!   \ CHREC of channel
     mdrget
@@ -4621,8 +4620,6 @@ hex 5D2F variable chnl          chnl !
 \ ______________________________________________________________________ 
 
 \ MGT DISCiPLE option
-
-0 variable mgt          mgt !
 
 .( RSAD )
 \ call DISCiPLE 44h hook code (RDAD)
@@ -4699,14 +4696,14 @@ decimal #SEC constant #sec
         or [ decimal 6 ] Literal ?error
     r> 
     If
-        mgt @
+        mgt @ 1 and
         If
             mgtrd
         Else
             mdrrd
         Then
     Else
-        mgt @
+        mgt @ 1 and
         If
             mgtwr
         Else
