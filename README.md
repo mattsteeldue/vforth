@@ -13,8 +13,8 @@ It uses all the 8 Microdrive units, somehow chained together, to offer 1778 bloc
 think nobody on Earth ever owned 8 Microdrive-units at the same time, so the only way to use this much storage is using an emulator.
 
 
-To run under Windows you should use  fuse.exe  
-To spare some timeat start-up, you can specify the switches to enable ZX Interface I and eight Microdrive units.
+To run under Windows you can use  fuse.exe  
+To spare some time at start-up, you can specify the switches to enable ZX Interface 1 and insert eight Microdrive cartridges.
 
     --interface1   
     --microdrive-file   M1.MDR  
@@ -36,13 +36,13 @@ In particular, !Blocks7.TAP file content was produced by "Mdr2Tap.bas" Basic pro
 DISCiPLE version 
 ----------------
 It uses both disks: unit #1 for MGT system and Forth itself and unit #2 for data storage to offer 1560 Blocks / Screens (780 KBytes). 
-Again, better use an emulator.
+Again, better use an emulator such as Fuse.
 To spare some time you can specify the suitable switches
 
     --disciple 
     --discipledisk Forth1.IMG 
 
-I'm not aware of a switch to insert the second floppy disk image at start-up, and you have to select Forth2.IMG via usual menu bar.
+I'm not aware of a switch Fuse provides to insert the second floppy disk image at start-up, and you have to select Forth2.IMG via usual menu bar.
 
 
 
