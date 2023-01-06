@@ -978,7 +978,7 @@ HEX
 
 
 ." (MAP) "
-\ translate character c1 using mapping string a2 and a2
+\ translate character c1 using mapping strings a2 and a2
 \ if c1 is not present within string a1 then 
 \ c2 = c2 if it is not translated. n is the length of both a1 and a2.
 CODE (map) ( a2 a1 n c1 -- c2 )
@@ -1251,7 +1251,7 @@ CODE curs ( -- )
             LDN     A'| HEX 02 N,   \ select channel #2
             CALL    HEX 1601 AA,
 
-            \ software-flash: flips face every 320 ms
+            \ software-flash: flips face every 640 ms
             LDN     A'| HEX 20 N,             \ Timing
             ANDA    (IY+ HEX 3E )|            \ FRAMES (5C3A+3E)
 
@@ -4893,22 +4893,25 @@ LIMIT @ FIRST @ - decimal 516 / constant #buff
 
 \ 7cb0h
 .( <# )
-: <#    ( -- ) 
+: <#    (   ud -- ud   ) 
+        ( n ud -- n ud )
     pad hld !
     ;
 
 
 \ 7cbf
 .( #> )
-: #>    
+: #>    ( d -- a u ) 
     2drop
-    hld @ pad over -
+    hld @       \ a
+    pad         \ a pad   
+    over -      \ a u
     ;
 
 
 \ 7cd4
 .( SIGN )
-: sign    ( n d -- d )
+: sign    ( n -- )
     0<
     If
         [ decimal 45 ] Literal hold
