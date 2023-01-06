@@ -2,7 +2,7 @@
 
 This is a back-porting to ZX Microdrive and DISCiPLE MGT from v.Forth NEXTZXOS version ( https://github.com/mattsteeldue/vforth-next ).
 
-Apart from some obvious hardware limitations, the NEXTZXOS documentation is valid for this backporting.
+Apart from some obvious hardware limitations, the v-Forth Next version documentation is valid for this backporting.
 
 To run this Forth system within an emulator, you have to pick one that supports Microdrive and/or DISCiPLE disk drive, such as Fuse (https://fuse-emulator.sourceforge.net) that works well under Windows and Linux.
 
