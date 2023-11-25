@@ -1,5 +1,5 @@
 File: c:\Zx\forth\F15\Forth2.IMG.txt
-Created: Sun Jan  1 16:14:11 2023
+Created: Sun Nov 19 23:01:39 2023
 
 Index:
 
@@ -779,7 +779,7 @@ Index:
   774 
   775 
   776 
-  777 
+  777 1
   778 
   779 
   780 
@@ -2192,7 +2192,7 @@ Scr# 35
  12 \ and remember Scr# 220
  13 \ to move up or down LIMIT
  14 \ and patch MGT and #SEC
- 15 
+ 15 \ (1560 instad of 1778)
 
 Scr# 36 
   0 ( RECURSE - GDC )
@@ -3211,9 +3211,9 @@ Scr# 92
   5   ?DO I 1+ LINE I -MOVE
   6   LOOP E ;
   7 : S ( n -- ) \ shift line n
-  8   L/SCR 1- BEGIN 2DUP <
-  9   WHILE DUP 1- H DUP RE 1-
- 10   REPEAT DROP E ;
+  8   DUP L/SCR 1- DO
+  9    I 1- LINE I -MOVE
+ 10   -1 +LOOP E ;
  11 : INS ( n -- ) \ insert from pad
  12   DUP S RE ; -->
  13 
@@ -15533,9 +15533,9 @@ Scr# 776
  15 
 
 Scr# 777 
-  0 
-  1 
-  2 
+  0 1
+  1 2
+  2 3
   3 
   4 
   5 
