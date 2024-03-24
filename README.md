@@ -16,12 +16,16 @@ I think nobody on Earth ever owned 8 Microdrive-units at the same time, so the o
 
 To run under Windows you can use  Fuse  and to spare some time at start-up, you can specify the switches to enable ZX Interface 1 and insert eight Microdrive cartridges.
 
-    --interface1   
-    --microdrive-file   M1.MDR  
-    --microdrive-2-file M2.MDR
-    -- etc.
-    --microdrive-8-file M8.MDR
-
+start fuse.exe ^
+    --interface1 ^
+    --microdrive-file M1.MDR   ^
+    --microdrive-2-file M2.MDR ^
+    --microdrive-3-file M3.MDR ^
+    --microdrive-4-file M4.MDR ^
+    --microdrive-5-file M5.MDR ^
+    --microdrive-6-file M6.MDR ^
+    --microdrive-7-file M7.MDR ^
+    --microdrive-8-file M8.MDR 
 
 Once the Spectrum is shows the copyright message, you should give the classic  RUN  to load the "run" loader.
 
@@ -37,20 +41,28 @@ In particular, !Blocks7.TAP file content was produced by "Mdr2Tap.bas" Basic pro
 DISCiPLE version 
 ----------------
 It uses both disks: unit #1 for MGT system and Forth itself and unit #2 for data storage to offer 1560 Blocks / Screens (780 KBytes). 
-Again, better use an emulator such as Fuse.
+Again, Fuse emulator works fine.
+
 To spare some time you can specify the suitable switches
 
-    --disciple 
+start fuse.exe ^
+    --disciple ^
     --discipledisk Forth1.IMG 
 
-I'm not aware of a switch Fuse provides to insert the second floppy disk image at start-up, and you have to select Forth2.IMG via usual menu bar.
+To start v-Forth system, you have to load the "run" Basic loader, usually  LOAD P6  would be fine.
+But, I'm not aware of a switch Fuse provides to insert the second floppy disk image at start-up, and you have to select Forth2.IMG via usual Menu bar.
+If you don't insert the second disk image you'll get an error message "NO DISK in drive".
 
-To start v-Forth system, you have to load the "run" Basic loader, usually  LOAD P6  would suffice.
 
 
 History
 -------
 
+__v-Forth 1.6__ 
+
+__build 20240321 - Matteo Vitturi, 1990-2024__
+
+Back-porting to 48/128 KB from v-Forth 1.6 - Sinclair ZX Spectrum Next Version.
 
 __v-Forth 1.52m__ 
 
