@@ -16,7 +16,7 @@ I think nobody on Earth ever owned 8 Microdrive-units at the same time, so the o
 
 To run under Windows you can use  Fuse  and to spare some time at start-up, you can specify the switches to enable ZX Interface 1 and insert eight Microdrive cartridges.
 
-start fuse.exe ^
+    start fuse.exe ^
     --interface1 ^
     --microdrive-file M1.MDR   ^
     --microdrive-2-file M2.MDR ^
@@ -45,7 +45,7 @@ Again, Fuse emulator works fine.
 
 To spare some time you can specify the suitable switches
 
-start fuse.exe ^
+    start fuse.exe ^
     --disciple ^
     --discipledisk Forth1.IMG 
 
