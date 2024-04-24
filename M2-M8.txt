@@ -1,5 +1,5 @@
-File: c:\Zx\forth\F15\tools\vForth\Forth2.IMG.txt
-Created: Sun Apr 21 00:02:20 2024
+File: M2-M8.txt
+Created: Sun Apr 21 00:02:19 2024
 
 Index:
 
@@ -319,6 +319,7 @@ Index:
  1553 ( VALUE TO )
  1554 \ test
  1560 ( DISCiPLE last block )
+ 1778 ( Mirodrive last block )
 
 Scr# 1 
   0 
@@ -489,7 +490,7 @@ Scr# 10
   3 \  : BLANKS BL FILL ;
   4 \ DECIMAL 9 LOAD \ Assemble
   5 \ External file
-  6 \ DECIMAL -11 LOAD \ F15m.f
+  6 \ DECIMAL -11 LOAD \ F16m.f
   7 EXIT
   8 
   9 
@@ -6007,3 +6008,21 @@ Scr# 1560
  13 
  14 
  15 
+
+Scr# 1778 
+  0 ( Mirodrive last block )
+  1 Emulator provides 8 micro-
+  2 drive units.
+  3 
+  4 The first unit is used to
+  5 keep the system loader and
+  6 the other 7 units are used
+  7 to store blocks.
+  8 
+  9 This Forth System uses a
+ 10 low-level direct access to
+ 11 sectors.
+ 12 
+ 13 This appears as a single
+ 14 file spread across 7
+ 15 cartridges.
