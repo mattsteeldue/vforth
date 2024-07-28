@@ -34,7 +34,7 @@ Running on real hardware
 ------------------------
 This Forth system was born and run on my  48K  for years, but to effectively run under real hardware, using a single Microdrive Unit, you need to use "run_HW" Basic loader instead of the usual "run" loader. That loader prompts you to switch cartridges, removing the "Programs" cartridge and inserting the "Blocks" one, and awaits a keypress.
 Conversely, the "Blocks" cartridge must be prepared beforehand using the Basic program "Tap2Mdr.bas" (available in M1.MDR cartridge-file) that reads from tape file !Blocks7.TAP  four string-array to be transferred to a single text file to fill all the cartridge. Usually such a transfer program breaks with "Microdrive full" message after 160/170 blocks, depending on the real capacity of a cartridge. At this point the real-hardware single-unit system is ready to run.
-In particular, !Blocks7.TAP file content was produced by "Mdr2Tap.bas" Basic program that exploits -- in Basic -- the same tecnique to achieve a  "Random R/W Access" from/to a single text file  "!Blocks"  present in all seven cartridge-files  M2.MDR ... M8.MDR
+In particular, !Blocks7.TAP file content was produced by "Mdr2Tap.bas" Basic program that exploits -- in Basic -- the same technique to achieve a  "Random R/W Access" from/to a single text file  "!Blocks"  present in all seven cartridge-files  M2.MDR ... M8.MDR
 
 
 
