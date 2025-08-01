@@ -12,7 +12,7 @@
 // 2 : for real hardware and a single microdrive configuration swapping cartridge 
 //     at startup
 // 4 : for emulator i.e. to use more than one microdrive within an emulator.
-                Variable_Def MGT,   "MGT",   4
+                Variable_Def MGT,   "MGT",   1
 
 // 7734h INKEY  <<<
 //
@@ -184,7 +184,8 @@
                 push    de
                 ex      de, hl
                 rst     08
-                db      $44         // WSAD 
+RSAD_ptr:                
+                db      $44         // RSAD 
                 pop     de
                 pop     bc
                 pop     ix
@@ -203,10 +204,11 @@
                 ex      de, hl
                 rst     08
                 db      $45     // WSAD 
-                pop     de
-                pop     bc
-                pop     ix
-                next
+                jr      RSAD_ptr
+//              pop     de
+//              pop     bc
+//              pop     ix
+//              next
 
 
 // MGTSTS )
@@ -244,8 +246,8 @@ MGTSTS_Endif:                                   // Endif
 
 // 7946h    
 //  number of blocks available
-                Constant_Def NSEC       ,   "#SEC"     ,   1778   // MDR
-//              Constant_Def NSEC       ,   "#SEC"     ,   1560   // Disciple
+//              Constant_Def NSEC       ,   "#SEC"     ,   1778   // MDR
+                Constant_Def NSEC       ,   "#SEC"     ,   1560   // Disciple
 
 // ______________________________________________________________________ 
 

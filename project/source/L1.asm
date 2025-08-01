@@ -181,7 +181,7 @@ User_Ptr:
                 User_Def CSP        , "CSP"       , 52 // used to temporary store Stack-Pointer value
                 User_Def RSHARP     , "R#"        , 54 // location of editing cursor
                 User_Def HLD        , "HLD"       , 56 // last character during a number conversion output
-                User_Def USE        , "USED"      , 58 // address of last used block
+                User_Def USED       , "USED"      , 58 // address of last used block
                 User_Def PREV       , "PREV"      , 60 // address of previous used block
                 User_Def LP         , "LP"        , 62 // line printer (not used)
                 User_Def PLACE      , "PLACE"     , 64 // number of digits after decimal point in output
@@ -264,7 +264,7 @@ User_Ptr:
                 exx
                 pop     de
                 pop     hl
-Unsigned_Less:
+Unsigned_Less_Exit:
                 and     a
                 sbc     hl, de
                 sbc     hl, hl
@@ -284,7 +284,7 @@ Unsigned_Less:
                 add     hl, bc
                 ex      de, hl
                 add     hl, bc
-                jr      Unsigned_Less
+                jr      Unsigned_Less_Exit
 //              and     a
 //              sbc     hl, de
 //              sbc     hl, hl
@@ -843,7 +843,7 @@ Accept_Else_0:                                  //      else
                 dw              ZBRANCH
                 dw              Accept_Else_2 - $
                 dw                  DROP, BL    //              drop bl ( a  bl )
-                dw                  ZERO        //              0       ( a  bl 0 )
+                dw                  ZERO        //              0       ( a  c  0 )
                                                 //          else
                 dw              BRANCH
                 dw              Accept_Endif_2 - $
@@ -863,6 +863,7 @@ Accept_Endif_2:
 Accept_Endif_3:
 Accept_Endif_0:                                 //      endif
                 dw          EMIT                //      emit            ( a )
+
                 dw          ZERO, I, ONE_PLUS   //      0 i 1+ !
                 dw          STORE               //          ( zero pad )
                 dw          I                   //      i

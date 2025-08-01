@@ -55,6 +55,33 @@ If you don't insert the second disk image you'll get an error message "NO DISK i
 
 
 
+128K memory
+-----------
+Microdrive and MGT versions work in 128K hardware too, but at startup you aren't able to access upper memory pages.
+To enable access to RAM pages fitted at address C000 you have to re-locate a few things using definitions available in
+Screen# 220. Once you type 220 LOAD two new definitions will be available, namely UP and DOWN: DOWN moves
+everything below C000 and UP restore everything above.
+
+        UP      DOWN
+LIMIT   FF58    C000
+FIRST   F340    B3E8
+R0 @    F2F0    B398
+TIB     F250    B2F8
+S0 @    F250    B2F8
+
+Once freed the upper 16K RAM page at $C000, you can use BANK! to fit any 16K page. BANK! Is available after you type #88 LOAD.
+
+For example:
+220 LOAD DOWN COLD  \ now 16 pages can be fitted at C000
+88 LOAD             \ make available BANK@ and BANK!
+BANK@ .             \ should display current page i.e. 0
+0 BANK! 3 $C000 !   \ store 3 at $C000 current page 0
+1 BANK! 4 $C000 !   \ store 4 at $C000 current page 1
+0 BANK! $C000 ?     \ display 3, i.e. the value stored in page 0.
+
+I didn't test very much this definitions, so let me know if you found any difficult.
+
+
 History
 -------
 

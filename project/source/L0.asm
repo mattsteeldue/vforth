@@ -5,7 +5,6 @@
 //  Origin-Area and Level-0 definitions
 //  ______________________________________________________________________ 
 
-
 Cold_origin:
                 and     a
                 jp      ColdRoutine
@@ -14,7 +13,7 @@ Warm_origin:
                 jp      WarmRoutine
 
 // +008
-SP_Basic:       dw      $F040               // These are bits with some "standard" meaning... 0101
+SP_Basic:       dw      $0101               // These are bits with some "standard" meaning... 0101
 
 // +00A                
                 dw      $0E00               
@@ -141,13 +140,13 @@ Exec_Ptr:
                 New_Def C_PLOOP, "(+LOOP)", is_code, is_normal
 
 Loop_Ptr:
-                pop     hl                  // get increment
-                ex      de, hl
-                // *** ldhlrp
-                push    bc                  // Save IP
-                ld      b, d                // bc is increment
+                push    de
+                exx
+                pop     hl                  // HL is RP
+                pop     de                  // DE get increment
+                ld      b, d                // bc is increment also
                 ld      c, e
-                push    hl
+
                 ld      e, (hl)             // hl points to loop-index, add increment to it.
                 ld      a, e                // de keeps index before increment.
                 add     c
@@ -174,16 +173,24 @@ Loop_Ptr:
                     ccf                     // carry-flag tracks bonudary limit crossing.
 Loop_NegativeIncrement:
                 jr      c, Loop_Endif
-                    pop     de              // Discard RP+3, retrieve original RP
-                    pop     bc                  // Retrieve IP
-                    jr      Branch_Ptr      // perform branch consuming following cell
+                    exx                     // restore IP and RP
+Branch_Ptr:                
+                    ld      a, (bc)
+                    ld      l, a
+                    inc     bc
+                    ld      a, (bc)
+                    ld      h, a
+                    dec     bc
+                    add     hl, bc
+                    ld      c, l
+                    ld      b, h
+                    next
 Loop_Endif:
-                pop     bc                  // discard original RP
-                ex      de, hl
-                inc     hl                  // keep    RP+4 (exit from loop)
-                // *** ldrphl                      // ld rp,hl macro 30h +Origin
-                ex      de, hl
-                pop     bc                  // Retrieve IP
+                inc     de                  // keep    RP+4 (exit from loop)
+                push    de
+                exx
+                pop     de
+End_Loop_Ptr:
                 inc     bc                  // skip branch-style offset
                 inc     bc
                 next
@@ -205,17 +212,7 @@ Loop_Endif:
 // compiled by ELSE, AGAIN and some other immediate words
 
                 New_Def BRANCH, "BRANCH", is_code, is_normal
-Branch_Ptr:                
-                ld      a, (bc)
-                ld      l, a
-                inc     bc
-                ld      a, (bc)
-                ld      h, a
-                dec     bc
-                add     hl, bc
-                ld      c, l
-                ld      b, h
-                next
+                jr Branch_Ptr
 
 
 //  ______________________________________________________________________ 
@@ -230,9 +227,10 @@ ZBranch_Ptr:
                 ld      a, l
                 or      h
                 jr      z, Branch_Ptr      
-                inc     bc                  // if not branch, skip offset cell.
-                inc     bc
-                next
+                jr      End_Loop_Ptr
+//              inc     bc                  // skip branch-style offseet
+//              inc     bc
+//              next
 
 //  ______________________________________________________________________ 
 //
@@ -295,10 +293,10 @@ Do_Ptr:
                  inc     hl
                  ld      (hl), d
                 exx
-                // skip branch-style offseet
-                inc     bc       
-                inc     bc
-                next
+                jr      End_Loop_Ptr
+//              inc     bc                  // skip branch-style offseet
+//              inc     bc
+//              next
 
 //  ______________________________________________________________________ 
 //
@@ -307,7 +305,7 @@ Do_Ptr:
 // this is a simpler version of (?DO)
                 New_Def C_DO, "(DO)", is_code, is_normal
                 dec     bc                  // prepare IP beforehand 
-                dec     bc                  // to balance the two final inc bc in (?do)
+                dec     bc                  // to balance the two final 2 inc bc in (?do)
                 jr      Do_Ptr
 
 //  ______________________________________________________________________ 
@@ -519,7 +517,7 @@ Find_WordEnd:   // word-end  found (**)
                 jr      nz, Find_VocabularyLoop        
     
                 pop     hl              // without this, leaves addr unchanged
-                ld      hl, FALSE_FLAG
+                ld      hl, 0
                 push    hl
                 exx
                 next
@@ -764,6 +762,10 @@ C_Emit_Bel:
                 ld      hl, $0200
                 push    ix                  // save Next Pointer
                 call    $03B6               // bleep Standard-ROM routine
+
+
+
+
                 pop     ix                  // restore Next Pointer
                 pop     de
                 pop     bc                  // restore Instruction Pointer
@@ -771,15 +773,17 @@ C_Emit_Bel:
                 push    hl
                 next
 
-C_Emit_Tab:     ld      hl, COMMA_CHAR
-                push    hl
-                exx
-                next
+C_Emit_Tab:     ld      a, COMMA_CHAR
+                jr      C_Emit_Printable
+            //  push    hl
+            //  exx
+            //  next
 
-C_Emit_NL       ld      hl, CR_CHAR           // 0x0A --> 0x0D  à la Spectrum
-                push    hl
-                exx
-                next
+C_Emit_NL       ld      a, CR_CHAR           // 0x0A --> 0x0D  à la Spectrum
+                jr      C_Emit_Printable
+            //  push    hl
+            //  exx
+            //  next
 
 //  ______________________________________________________________________ 
 
@@ -1155,7 +1159,7 @@ Um_DivMod_OutOfRange:
                 ld      l, a
                 ld      a, d
                 and     h
-Boolean_ending:
+Boolean_exit:
                 ld      h, a
                 push    hl
                 exx
@@ -1174,7 +1178,7 @@ Boolean_ending:
                 ld      l, a
                 ld      a, d
                 or      h
-                jr      Boolean_ending
+                jr      Boolean_exit
 //              ld      h, a
 //              push    hl
 //              exx
@@ -1193,7 +1197,7 @@ Boolean_ending:
                 ld      l, a
                 ld      a, d
                 xor     h
-                jr      Boolean_ending
+                jr      Boolean_exit
 //              ld      h, a
 //              push    hl
 //              exx
@@ -1337,10 +1341,10 @@ Zero_Equal:
                 pop     hl
                 ld      a, l
                 or      h
-                ld      hl, FALSE_FLAG
                 jr      nz, ZEqual_Skip
-                    dec     hl
+                    ccf
 ZEqual_Skip:    
+                sbc     hl, hl
                 psh1
 
 //  ______________________________________________________________________ 
@@ -1368,12 +1372,10 @@ ZEqual_Skip:
                 pop     hl
                 ld      a, l
                 or      h
+                jr      z, ZGreater_Skip
                 add     hl, hl
-                ld      hl, FALSE_FLAG
-                jr      c, ZGreater_Skip
-                    and     a
-                    jr      z, ZGreater_Skip
-                        dec     hl
+                ccf
+                sbc     hl, hl
 ZGreater_Skip:  
                 psh1
 
@@ -1450,7 +1452,7 @@ Two_Plus:
 // cell+        a1 -- a2
 // increment by 2 top of stack
                 New_Def CELL_PLUS, "CELL+", is_code, is_normal
-                jp      Two_Plus
+                jr      Two_Plus
 
 //  ______________________________________________________________________ 
 //
@@ -1485,7 +1487,8 @@ CellMinus:
                 New_Def MINUS, "NEGATE", is_code, is_normal
                 exx
                 pop     de
-                xor      a
+                xor     a
+Negate_Ptr:                
                 ld      h, a               // subtract from 0
                 ld      l, a
                 sbc     hl, de
@@ -1499,20 +1502,22 @@ CellMinus:
 // change the sign of a double number
                 New_Def DMINUS, "DNEGATE", is_code, is_normal
                 exx
-                pop     bc                  // d1.H
-                pop     de                  // d1.L
+                pop     de                  // d1.H
+                pop     bc                  // d1.L
                 xor     a
+
                 ld      h, a                
                 ld      l, a
-                sbc     hl, de              // subtact from zero
+                sbc     hl, bc              // subtact from zero
                 push    hl                  // > d2-L
-                ld      h, a
-                ld      l, a
-                sbc     hl, bc              // subtract from zero with carry
+                jr      Negate_Ptr
+//              ld      h, a
+//              ld      l, a
+//              sbc     hl, de              // subtract from zero with carry
                                             // > d2-H
-                push    hl                  
-                exx
-                next
+//              push    hl                  
+//              exx
+//              next
 
 //  ______________________________________________________________________ 
 //
@@ -1938,8 +1943,8 @@ Roll_Zero:
                 New_Def PSTORE, "P!", is_code, is_normal
                 exx
                 pop     bc
-                pop     de                  // < c
-                out     (c), e              // low-byte
+                pop     hl                  // < c
+                out     (c), l              // low-byte
                 exx
                 next
 

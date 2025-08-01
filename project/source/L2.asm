@@ -109,6 +109,7 @@ Vocabulary_Does:
 
                 New_Def FORTH, "FORTH", Does_Ptr, is_immediate
                 dw      Vocabulary_Does
+
                 db      $81, $A0
 Forth_Latest_Ptr:                
                 dw      Latest_Definition // Fence_Word // Latest_Definition // Here_Dictionary
@@ -180,15 +181,21 @@ Quit_Endif:                                     //      else
 //
 // abort        --
                 Colon_Def ABORT, "ABORT", is_normal
-                dw      S0, FETCH, SPSTORE      // s0 @ sp!
-
+                dw      S0, FETCH               // s0 @
+                dw      BL                      // bl
+                dw      OVER, STORE             // over !
+                dw      SPSTORE                 // sp!
                 dw      DECIMAL                 // decimal
                 dw      FORTH                   // [compile] forth
                 dw      DEFINITIONS             // definitions
+
+                dw      SQUARED_OPEN            // [compile] [
+                dw      R0, FETCH, RPSTORE      //      r0 @ rp!
+
 Autoexec_Ptr:                
                 dw      AUTOEXEC                // autoexec, patched to noop
                 dw      QUIT                    // quit
-                dw      EXIT                    // ;
+//              dw      EXIT                    // ;
 
 //  ______________________________________________________________________ 
 //
@@ -196,9 +203,9 @@ Autoexec_Ptr:
                 Colon_Def WARM, "WARM", is_normal
 //              dw      BLK_INIT                // blk-init
                 dw      SPLASH                  // splash
-                dw      LIT, 7, EMIT            // 7 emit
+            //  dw      LIT, 7, EMIT            // 7 emit
                 dw      ABORT                   // abort
-                dw      EXIT                    // exit
+            //  dw      EXIT                    // exit
 
 //  ______________________________________________________________________ 
 //
@@ -217,12 +224,15 @@ Autoexec_Ptr:
                 dw      STORE                   // ! 
                 dw      ZERO, NMODE, STORE      // 0 nmode !
                 dw      FIRST, FETCH, DUP       // first @ dup
-                dw      USE, STORE              // use !
+                dw      USED, STORE             // use !
                 dw      PREV, STORE             // prev !
                 dw      LIT, 4, PLACE, STORE    // 4 place !
 //              dw      LIT, 8
 //              dw      LIT, FLAGS2, CSTORE     // 8 5C6A c!
+                dw      EMPTY_BUFFERS
+
                 dw      TWO, HP, STORE          // 2 hp !
+
 Warm_Start:     dw      WARM
 Cold_Start:     dw      COLD      
                 dw      EXIT        
@@ -230,8 +240,6 @@ Cold_Start:     dw      COLD
 //  ______________________________________________________________________ 
 WarmRoutine:
 ColdRoutine:
-                ld      ix, Next_Ptr            // Inner Interpreter Pointer
-
                 exx
                 push    hl                      // save Basic's return address
                 exx
@@ -240,9 +248,8 @@ ColdRoutine:
                 // pre-set the four main 16-bit registers
                 ld      sp, (S0_origin)         // Calculator Stack Pointer
                 ld      hl, (R0_origin)         // Return Stack Pointer
-                // ld      de, (R0_origin)         // Return Stack Pointer
-                ldrphl
                 ex      de, hl
+                ld      ix, Next_Ptr            // Inner Interpreter Pointer
                 ld      bc, Warm_Start          // Instruction Pointer
 
                 jr      c, Warm_Skip
@@ -465,14 +472,12 @@ Fm_Mod_Endif:
 // it returns the address a and ca counter b = C/L meaning a whole line.
                 Colon_Def CLINE, "(LINE)", is_normal
                 dw      TO_R                    // >r
-                dw      NOOP                    // noop
                 dw      CL                      // c/l
                 dw      BBUF, MUL_DIV_MOD       // */mod
                 dw      R_TO                    // r>
                 dw      BSCR, MUL, PLUS         // b/scr * +
                 dw      BLOCK                   // block   ( forward )
                 dw      PLUS                    // +
-                dw      NOOP                    // noop
                 dw      CL                      // c/l
                 dw      EXIT                    // ;
 
@@ -497,9 +502,8 @@ Fm_Mod_Endif:
                                                 // if
                 dw      ZBRANCH
                 dw      Message_Else - $
-                dw          LIT, 4              //      4
-                dw          OFFSET, FETCH       //      offset @
-                dw          BSCR, DIV, SUBTRACT //      b/scr / -
+                dw          LIT, 32, PLUS       //      32 +
+                dw          TWO                 //      2
                 dw          DOT_LINE            //      .line
                 dw          SPACE               //      space
                                                 // else

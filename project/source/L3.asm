@@ -100,7 +100,7 @@ PBuf_Endif:                                     // endif
 // disk before reading the block n.
 
                 Colon_Def BUFFER, "BUFFER", is_normal
-                dw      USE, FETCH              // use @
+                dw      USED, FETCH             // used @
                 dw      DUP, TO_R               // dup >r
                                                 // begin
 Buffer_Begin:                                                
@@ -108,7 +108,7 @@ Buffer_Begin:
                                                 // until
                 dw      ZBRANCH
                 dw      Buffer_Begin - $
-                dw      USE, STORE              // use !
+                dw      USED, STORE             // used !
                 dw      R_OP, FETCH, ZLESS      // r @ 0<
                                                 // if
                 dw      ZBRANCH
@@ -134,8 +134,9 @@ Buffer_Endif:                                   // endif
 // See also BUFFER, R/W, UPDATE, FLUSH.
 
                 Colon_Def BLOCK, "BLOCK", is_normal
-                dw      OFFSET, FETCH           // offset @
-                dw      PLUS, TO_R              // + >r
+            //  dw      OFFSET, FETCH           // offset @
+            //  dw      PLUS                    // + 
+                dw      TO_R                    // + >r
                 dw      PREV, FETCH             // prev @
                 dw      DUP, FETCH              // dup @
                 dw      R_OP, SUBTRACT          // r -
@@ -473,8 +474,8 @@ Index_Leave:
                 dw      C_DOT_QUOTE
                 db      68
                 db      "v-Forth 1.6 MDR/MGT version", 13
-                db      "build 20240420", 13
-                db      "1990-2024 Matteo Vitturi", 13
+                db      "build 20250917", 13
+                db      "1990-2025 Matteo Vitturi", 13
                 dw      EXIT
 
 //  ______________________________________________________________________ 
@@ -688,7 +689,7 @@ Load_Endif:
                 Colon_Def BEGIN, "BEGIN", is_immediate
                 dw      QCOMP
                 dw      HERE
-                dw      ONE
+                dw      TWO
                 dw      EXIT
 
 //  ______________________________________________________________________ 
@@ -696,7 +697,7 @@ Load_Endif:
 // again        ( a 1 -- ) \ compile-time
                 Colon_Def AGAIN, "AGAIN", is_immediate
                 dw      QCOMP
-                dw      ONE, QPAIRS
+                dw      TWO, QPAIRS
                 dw      COMPILE, BRANCH
                 dw      BACK
                 dw      EXIT
@@ -706,7 +707,7 @@ Load_Endif:
 // until        ( a 1 -- ) \ compile-time
                 Colon_Def UNTIL, "UNTIL", is_immediate
                 dw      QCOMP
-                dw      ONE, QPAIRS
+                dw      TWO, QPAIRS
                 dw      COMPILE, ZBRANCH
                 dw      BACK
                 dw      EXIT
@@ -723,16 +724,16 @@ Load_Endif:
 // while        ( a1 1 -- a1 1 a2 4 ) \ compile-time
                 Colon_Def WHILE, "WHILE", is_immediate
                 dw      IF
-                dw      TWO_PLUS // ( that is 4 )
+//              dw      TWO_PLUS // ( that is 4 )
+                dw      TWO_SWAP
                 dw      EXIT
 
 //  ______________________________________________________________________ 
 //
 // repeat       ( a1 1 a2 4 -- ) \ compile-time
                 Colon_Def REPEAT, "REPEAT", is_immediate
-                dw      TWO_SWAP
                 dw      AGAIN
-                dw      TWO, SUBTRACT
+//              dw      TWO_MINUS
                 dw      THEN
                 dw      EXIT
 
@@ -743,8 +744,7 @@ Load_Endif:
                 Colon_Def C_DO_BACK, "?DO-", is_normal
                 dw      BACK
 CDoBack_Begin:                
-                dw      SPFETCH, CSP, FETCH
-                dw      SUBTRACT
+                dw      SPFETCH, CSP, FETCH, SUBTRACT
                 dw      ZBRANCH
                 dw      CDoBack_While - $
                 dw          TWO_PLUS, THEN
