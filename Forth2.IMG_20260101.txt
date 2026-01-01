@@ -1834,7 +1834,7 @@ Scr# 89
   8 \
   9 HEX
  10 : BANK@ ( -- n )
- 11  5B5B @ 7 AND
+ 11  5B5C @ 7 AND
  12 ;
  13 DECIMAL
  14 
